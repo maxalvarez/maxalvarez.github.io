@@ -1,0 +1,15 @@
+project:
+  type: website
+
+website:
+  title: "Maximiliano Alvarez"
+  navbar:
+    left:
+      - href: index.qmd
+        text: Home
+      - href: about.qmd
+        text: About
+
+format:
+  html:
+    theme: cosmo

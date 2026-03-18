@@ -1,0 +1,7 @@
+---
+title: Home
+---
+
+Welcome to my website
+
+Here I will publish economic and population analyses, data visualisations, brief research notes and code projects.
