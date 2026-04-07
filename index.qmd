@@ -1,7 +1,3 @@
----
-title: Home
----
-
 Hello World!
 
 I'm Max, an economist, multidisciplinary researcher and data science enthusiast with extensive expertise in labour, housing and energy markets, and population and consumer behaviour. I enjoy devising innovative problem-solving approaches and leading large and complex quantitative projects to deliver actionable insights for decision-making.
