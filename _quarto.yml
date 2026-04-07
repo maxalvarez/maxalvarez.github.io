@@ -7,6 +7,9 @@ website:
     left:
       - href: blog.qmd
         text: Blog
+    tools:
+      - icon: linkedin
+        href: https://www.linkedin.com/in/maximiliano-alvarez-c
   search: true
   open-graph: true
 
