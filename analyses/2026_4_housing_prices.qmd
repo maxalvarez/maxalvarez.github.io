@@ -1,0 +1,7 @@
+---
+title: "Is there a better time in the year to buy a house in Australia?"
+date: 2026-04-07
+categories: [Housing Economics]
+description: "I want to know whether dwelling prices in Australia are seasonal."
+---
+In this analysis, I explore whether there is a better time in the year to buy a house in Australia. I use data on dwelling prices from the Australian Bureau of Statistics (ABS) and apply time series analysis to identify any seasonal patterns in the housing market. By understanding these patterns, potential homebuyers can make more informed decisions about when to enter the market.

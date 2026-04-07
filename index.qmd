@@ -2,6 +2,9 @@
 title: Home
 ---
 
-Welcome to my website
+Hello World!
 
-Here I will publish economic and population analyses, data visualisations, brief research notes and code projects.
+I'm Max, an economist, multidisciplinary researcher and data science enthusiast with extensive expertise in labour, housing and energy markets, and population and consumer behaviour. I enjoy devising innovative problem-solving approaches and leading large and complex quantitative projects to deliver actionable insights for decision-making.
+
+In this website I will be publishing economic and population analyses, data visualisations, brief research notes and code projects.
+

@@ -5,11 +5,15 @@ website:
   title: "Maximiliano Alvarez"
   navbar:
     left:
-      - href: index.qmd
-        text: Home
-      - href: about.qmd
-        text: About
+      - href: blog.qmd
+        text: Blog
+  search: true
+  open-graph: true
 
 format:
   html:
     theme: cosmo
+
+execute:
+  freeze: true
+  
