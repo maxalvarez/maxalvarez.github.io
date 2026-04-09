@@ -1,5 +1,4 @@
 ---
-title: Blog
 listing:
     contents:
         - analyses
@@ -8,5 +7,3 @@ listing:
     categories: true
     fields: [title, date, categories, description]
 ---
-
-Here are analyses and code snippets.
