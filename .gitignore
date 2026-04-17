@@ -3,3 +3,7 @@
 *_files/
 Thumbs.db
 _site/
+
+# ETL: raw downloads are not committed
+data/raw/*
+!data/raw/.gitkeep
