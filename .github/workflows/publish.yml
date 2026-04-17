@@ -21,6 +21,17 @@ jobs:
       - name: Set up Quarto
         uses: quarto-dev/quarto-actions/setup@v2
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install Python dependencies
+        run: pip install pandas openpyxl
+
+      - name: Run ETL
+        run: python etl/housing_prices.py
+
       - name: Render site
         run: quarto render
 

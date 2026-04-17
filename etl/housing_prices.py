@@ -47,7 +47,7 @@ def load(df: pd.DataFrame, dest: Path) -> None:
 if __name__ == "__main__":
     RAW_DIR.mkdir(parents=True, exist_ok=True)
     download(URL, RAW_FILE)
-    xl = extract(RAW_FILE)
-    df = transform(xl)
+    df = extract(RAW_FILE)
+    df = transform(df)
     load(df, PROCESSED_FILE)
     print("Done.")
