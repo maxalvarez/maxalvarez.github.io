@@ -27,7 +27,7 @@ jobs:
           python-version: "3.13"
 
       - name: Install Python dependencies
-        run: pip install pandas openpyxl
+        run: pip install pandas openpyxl jupyter
 
       - name: Run ETL
         run: python etl/housing_prices.py
