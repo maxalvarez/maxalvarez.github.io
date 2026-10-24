@@ -3,7 +3,12 @@
 *_files/
 Thumbs.db
 _site/
+_freeze/
 
-# ETL: raw downloads are not committed
+# ETL: raw downloads and processed outputs are regenerated in CI, not committed
 data/raw/*
 !data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+
+__pycache__/

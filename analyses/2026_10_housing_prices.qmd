@@ -1,0 +1,55 @@
+---
+title: "Is there a better time in the year to buy a house in Australia?"
+date: 2026-10-24
+categories: [Housing Economics]
+description: "I want to know whether dwelling prices in Australia are seasonal."
+---
+
+In this analysis, I explore whether there is a better time in the year to buy a house in Australia. I use data on median prices of established house transfers from the Australian Bureau of Statistics and apply time series analysis to identify any seasonal patterns in the housing market. By understanding these patterns, potential homebuyers can make more informed decisions about when to enter the market.
+
+## Capital city house prices
+
+```{python}
+#| label: fig-capital-prices
+#| echo: false
+
+import sys
+
+import pandas as pd
+import matplotlib.pyplot as plt
+from IPython.display import Markdown, display
+
+sys.path.insert(0, "../etl")
+from housing_prices import CATALOGUE, PROCESSED_FILE, RELEASE_LABEL, TABLE
+
+CAPITALS = [
+    "Sydney", "Melbourne", "Brisbane", "Adelaide",
+    "Perth", "Hobart", "Darwin", "Canberra",
+]
+MEASURE = "Median Price of Established House Transfers (Unstratified)"
+
+df = pd.read_csv(PROCESSED_FILE, parse_dates=["date"])
+series = (
+    df.loc[(df["measure"] == MEASURE) & df["region"].isin(CAPITALS)]
+      .pivot(index="date", columns="region", values="value")
+)
+# Order the lines by latest value so the legend reads top-down with the chart.
+legend_order = series.iloc[-1].sort_values(ascending=False).index
+series = series[legend_order]
+
+fig, ax = plt.subplots(figsize=(10, 6))
+series.plot(ax=ax, linewidth=1.4)
+ax.set_ylabel("Median price ($'000)")
+ax.set_xlabel("")
+ax.legend(loc="upper left", frameon=False, ncol=2)
+ax.grid(True, alpha=0.3)
+ax.margins(x=0)
+plt.tight_layout()
+plt.show()
+
+display(Markdown(
+    f"*Median price of established house transfers, Australian capital cities. "
+    f"Source: Australian Bureau of Statistics, Total Value of Dwellings, "
+    f"{RELEASE_LABEL} (cat. no. {CATALOGUE}), {TABLE}.*"
+))
+```

@@ -1,6 +1,6 @@
 on:
   push:
-    branches: main
+    branches: [main]
 
 name: Quarto Publish
 
@@ -27,7 +27,7 @@ jobs:
           python-version: "3.13"
 
       - name: Install Python dependencies
-        run: pip install pandas openpyxl jupyter
+        run: pip install -r requirements.txt
 
       - name: Run ETL
         run: python etl/housing_prices.py
