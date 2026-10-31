@@ -1,9 +1,8 @@
 ---
 listing:
-    contents:
-        - analyses
-    sort: "date desc"
-    type: default
-    categories: true
-    fields: [title, date, categories, description]
+  contents:
+    - analyses
+  sort: "date desc"
+  categories: true
+  fields: [title, date, categories, description]
 ---

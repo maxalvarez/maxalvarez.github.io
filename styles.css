@@ -1,0 +1,6 @@
+/* Lets touch users scroll past the tall figures; the zoom buttons still work. */
+@media (pointer: coarse) {
+  .js-plotly-plot .nsewdrag {
+    pointer-events: none !important;
+  }
+}

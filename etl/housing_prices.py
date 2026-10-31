@@ -6,7 +6,8 @@ Downloads the ABS Excel workbook for the chosen release and writes a tidy
 long CSV to data/processed/housing_prices.csv with one row per
 (date, region, measure).
 
-To point at a newer release, bump QUARTER_MONTH / YEAR and re-run.
+To point at a newer release, bump QUARTER_MONTH / YEAR. The URL and figure
+citation follow, and CI re-runs this on push.
 """
 
 import calendar
@@ -15,13 +16,15 @@ from pathlib import Path
 
 import pandas as pd
 
+# Reference quarter of the ABS release: end month (3, 6, 9 or 12) and year.
 QUARTER_MONTH = 6
 YEAR = 2026
 
 CATALOGUE = "6432.0"
 TABLE = "Table 2"
-RELEASE_LABEL = f"{calendar.month_name[QUARTER_MONTH]} Quarter {YEAR}"
-_QUARTER_SLUG = f"{calendar.month_name[QUARTER_MONTH][:3].lower()}-quarter-{YEAR}"
+_MONTH = calendar.month_name[QUARTER_MONTH]
+RELEASE_LABEL = f"{_MONTH} Quarter {YEAR}"
+_QUARTER_SLUG = f"{_MONTH[:3].lower()}-quarter-{YEAR}"
 URL = f"https://www.abs.gov.au/statistics/economy/price-indexes-and-inflation/total-value-dwellings/{_QUARTER_SLUG}/643202.xlsx"
 
 _ROOT = Path(__file__).parent.parent
@@ -35,7 +38,6 @@ DATA_START = 10
 
 def download(url: str, dest: Path) -> None:
     print(f"Downloading {url}")
-    dest.parent.mkdir(parents=True, exist_ok=True)
     urllib.request.urlretrieve(url, dest)
     print(f"Saved raw file to {dest}")
 
@@ -48,14 +50,13 @@ def extract(path: Path) -> pd.DataFrame:
 
 def transform(df: pd.DataFrame) -> pd.DataFrame:
     titles = df.iloc[TITLE_ROW, 1:].tolist()
-    body = df.iloc[DATA_START:, :].copy()
+    body = df.iloc[DATA_START:].copy()
     body.columns = ["date"] + titles
     body["date"] = pd.to_datetime(body["date"])
 
     long = body.melt(id_vars="date", var_name="title", value_name="value").dropna(subset=["value"])
-    split = long["title"].str.split(" ;  ", n=2, expand=True)
-    long["measure"] = split[0].str.strip(" ;")
-    long["region"] = split[1].str.strip(" ;")
+    # ABS titles read "<measure> ;  <region> ;", with a double space after the first semicolon.
+    long[["measure", "region"]] = long["title"].str.rstrip(" ;").str.split(" ;  ", expand=True)
     long["value"] = pd.to_numeric(long["value"])
 
     out = (
@@ -71,7 +72,6 @@ def transform(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def load(df: pd.DataFrame, dest: Path) -> None:
-    dest.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(dest, index=False)
     print(f"Saved processed data to {dest}")
 

@@ -1,27 +1,29 @@
 ---
 title: "Is there a better time in the year to buy a house in Australia?"
-date: 2026-10-24
+date: 2026-10-31
 categories: [Housing Economics]
-description: "I want to know whether dwelling prices in Australia are seasonal."
+description: "I want to know whether house prices in Australian capital cities are seasonal."
 ---
 
-In this analysis, I explore whether there is a better time in the year to buy a house in Australia. I use data on median prices of established house transfers from the Australian Bureau of Statistics and apply time series analysis to identify any seasonal patterns in the housing market. By understanding these patterns, potential homebuyers can make more informed decisions about when to enter the market.
+In this analysis, I explore whether there is a better time in the year to buy a house in Australia. I use median prices of established house sales from the Australian Bureau of Statistics. As a first step, I strip out long-run price growth to see how each city's prices move within the year.
 
-## Capital city house prices
+## House prices relative to trend, capital cities
 
 ```{python}
-#| label: fig-capital-prices
+#| label: capital-prices
 #| echo: false
 
 import sys
 
 import pandas as pd
-import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 from IPython.display import Markdown, display
+from plotly.subplots import make_subplots
 
 sys.path.insert(0, "../etl")
 from housing_prices import CATALOGUE, PROCESSED_FILE, RELEASE_LABEL, TABLE
 
+# Display order of the cities.
 CAPITALS = [
     "Sydney", "Melbourne", "Brisbane", "Adelaide",
     "Perth", "Hobart", "Darwin", "Canberra",
@@ -30,26 +32,97 @@ MEASURE = "Median Price of Established House Transfers (Unstratified)"
 
 df = pd.read_csv(PROCESSED_FILE, parse_dates=["date"])
 series = (
-    df.loc[(df["measure"] == MEASURE) & df["region"].isin(CAPITALS)]
-      .pivot(index="date", columns="region", values="value")
+    df.loc[df["measure"] == MEASURE]
+      .pivot(index="date", columns="region", values="value")[CAPITALS]
 )
-# Order the lines by latest value so the legend reads top-down with the chart.
-legend_order = series.iloc[-1].sort_values(ascending=False).index
-series = series[legend_order]
+# Percentage deviation from a centred 4-quarter moving average (2x4 MA). Unlike an annual
+# mean, this also removes the within-year drift, which would otherwise read as seasonality.
+# It needs two quarters either side, so each end of the sample loses two.
+trend = series.rolling(4).mean().rolling(2).mean().shift(-2)
+deviation = ((series / trend - 1) * 100).dropna()
 
-fig, ax = plt.subplots(figsize=(10, 6))
-series.plot(ax=ax, linewidth=1.4)
-ax.set_ylabel("Median price ($'000)")
-ax.set_xlabel("")
-ax.legend(loc="upper left", frameon=False, ncol=2)
-ax.grid(True, alpha=0.3)
-ax.margins(x=0)
-plt.tight_layout()
-plt.show()
+QUARTER_BANDS = {
+    "Q1 (Mar)": "#ffffff", "Q2 (Jun)": "#eeeeee", "Q3 (Sep)": "#d9d9d9", "Q4 (Dec)": "#bdbdbd",
+}
+# One heatmap per panel draws the quarter bands: cells are centred on each observation, so a
+# point sits inside its own quarter, and it stays fast where 750 shapes would make zoom lag.
+band_colours = [
+    [bound, shade]
+    for i, shade in enumerate(QUARTER_BANDS.values())
+    for bound in (i / 4, (i + 1) / 4)
+]
+
+fig = make_subplots(
+    rows=8, cols=1, shared_xaxes=True, vertical_spacing=0.03, subplot_titles=CAPITALS,
+)
+for row, city in enumerate(CAPITALS, start=1):
+    low, high = deviation[city].agg(["min", "max"])
+    padding = 0.05 * (high - low)
+    y_range = [low - padding, high + padding]
+    fig.add_trace(
+        go.Heatmap(
+            x=deviation.index, y=y_range, z=[deviation.index.quarter] * 2,
+            zmin=0.5, zmax=4.5, colorscale=band_colours,
+            showscale=False, hoverinfo="skip",
+        ),
+        row=row, col=1,
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=deviation.index, y=deviation[city], mode="lines", name=city,
+            line={"color": "#08306b", "width": 1.5}, showlegend=False,
+            hovertemplate="Q%{x|%q %Y}<br>%{y:.1f}%",
+        ),
+        row=row, col=1,
+    )
+    fig.update_yaxes(range=y_range, row=row, col=1)
+fig.add_hline(y=0, line={"color": "black", "width": 0.8})
+
+# Empty traces supply the quarter legend, because the heatmaps have no legend entries.
+for label, shade in QUARTER_BANDS.items():
+    fig.add_trace(go.Scatter(
+        x=[None], y=[None], mode="markers", name=label,
+        marker={
+            "symbol": "square", "size": 13, "color": shade,
+            "line": {"color": "#999999", "width": 1},
+        },
+    ))
+
+fig.update_xaxes(
+    dtick="M12", tickformat="%Y", tickangle=-90, ticks="outside", showgrid=False,
+    showline=True, linecolor="black", mirror=True,
+)
+# A fixed y-range makes dragging zoom along time only, keeping every panel's scale.
+fig.update_yaxes(
+    dtick=2, ticks="outside", showgrid=False, zeroline=False, showline=True,
+    linecolor="black", mirror=True, fixedrange=True,
+)
+fig.update_annotations(x=0, xanchor="left", font_size=14)
+fig.add_annotation(
+    text="Deviation from trend (%)", textangle=-90, showarrow=False,
+    xref="paper", yref="paper", x=0, y=0.5, xshift=-45, font_size=14,
+)
+fig.update_layout(
+    height=1150, margin={"l": 60, "r": 10, "t": 60, "b": 50},
+    template="plotly_white",
+    legend={
+        "orientation": "h", "x": 0.5, "xanchor": "center", "y": 1, "yanchor": "top",
+        "yref": "container", "entrywidth": 90, "itemclick": False, "itemdoubleclick": False,
+    },
+)
+fig.show(config={
+    "displayModeBar": True,
+    "displaylogo": False,
+    "modeBarButtons": [["zoomIn2d", "zoomOut2d", "autoScale2d"]],
+})
 
 display(Markdown(
-    f"*Median price of established house transfers, Australian capital cities. "
-    f"Source: Australian Bureau of Statistics, Total Value of Dwellings, "
+    "*Median price of established houses sold in each capital city, as a percentage above "
+    "or below its trend. The trend is a centred 4-quarter moving average, which smooths out "
+    "seasonal swings and long-run price growth, so the first and last two quarters of the "
+    f"data cannot be shown (the chart ends in the {deviation.index.max():%B %Y} quarter). "
+    "Vertical scales differ by city. "
+    "Source: Australian Bureau of Statistics, Total Value of Dwellings, "
     f"{RELEASE_LABEL} (cat. no. {CATALOGUE}), {TABLE}.*"
 ))
 ```

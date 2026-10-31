@@ -10,13 +10,9 @@ website:
     tools:
       - icon: linkedin
         href: https://www.linkedin.com/in/maximiliano-alvarez-c
-  search: true
   open-graph: true
 
 format:
   html:
     theme: cosmo
-
-execute:
-  freeze: true
-  
+    css: styles.css
