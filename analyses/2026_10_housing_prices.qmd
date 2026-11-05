@@ -5,9 +5,13 @@ categories: [Housing Economics]
 description: "I want to know whether house prices in Australian capital cities are seasonal."
 ---
 
-In this analysis, I explore whether there is a better time in the year to buy a house in Australia. I use median prices of established house sales from the Australian Bureau of Statistics. As a first step, I strip out long-run price growth to see how each city's prices move within the year.
+::: {.column-screen}
+![Real estate boards in Rosanna, Melbourne, in 2026: one townhouse sold at a winter auction, the one next door is up for auction in spring.](images/melbourne_auction_2026.jpeg){.hero-image fig-alt="Two real estate agents' boards outside neighbouring townhouses in Rosanna, Melbourne. One is marked sold after an August auction; the other is still for sale."}
+:::
 
-## House prices relative to trend, capital cities
+In this analysis, I explore whether there is a better time in the year to buy a house in Australia. I use median prices of established house sales from the Australian Bureau of Statistics. As a first step, I strip out long-run price growth to see how each city's prices move within the year, and set this against plain quarter-on-quarter growth.
+
+## House prices relative to trend and quarterly growth, capital cities
 
 ```{python}
 #| label: capital-prices
@@ -21,25 +25,24 @@ from IPython.display import Markdown, display
 from plotly.subplots import make_subplots
 
 sys.path.insert(0, "../etl")
-from housing_prices import CATALOGUE, PROCESSED_FILE, RELEASE_LABEL, TABLE
+from housing_prices import SOURCE, CAPITALS, load_capitals
 
-# Display order of the cities.
-CAPITALS = [
-    "Sydney", "Melbourne", "Brisbane", "Adelaide",
-    "Perth", "Hobart", "Darwin", "Canberra",
-]
-MEASURE = "Median Price of Established House Transfers (Unstratified)"
+series = load_capitals()
 
-df = pd.read_csv(PROCESSED_FILE, parse_dates=["date"])
-series = (
-    df.loc[df["measure"] == MEASURE]
-      .pivot(index="date", columns="region", values="value")[CAPITALS]
-)
 # Percentage deviation from a centred 4-quarter moving average (2x4 MA). Unlike an annual
 # mean, this also removes the within-year drift, which would otherwise read as seasonality.
 # It needs two quarters either side, so each end of the sample loses two.
 trend = series.rolling(4).mean().rolling(2).mean().shift(-2)
 deviation = ((series / trend - 1) * 100).dropna()
+# Quarter-on-quarter growth needs only the previous quarter, so it runs further at both ends.
+growth = (series.pct_change(fill_method=None) * 100).dropna(how="all")
+# The quarter bands span every quarter that has either line.
+quarters = growth.index.union(deviation.index)
+
+LINES = {
+    "Deviation from trend": (deviation, "#08306b"),
+    "Quarter-on-quarter growth": (growth, "#e66101"),
+}
 
 QUARTER_BANDS = {
     "Q1 (Mar)": "#ffffff", "Q2 (Jun)": "#eeeeee", "Q3 (Sep)": "#d9d9d9", "Q4 (Dec)": "#bdbdbd",
@@ -56,25 +59,28 @@ fig = make_subplots(
     rows=8, cols=1, shared_xaxes=True, vertical_spacing=0.03, subplot_titles=CAPITALS,
 )
 for row, city in enumerate(CAPITALS, start=1):
-    low, high = deviation[city].agg(["min", "max"])
+    both = pd.concat([deviation[city], growth[city]])
+    low, high = both.min(), both.max()
     padding = 0.05 * (high - low)
     y_range = [low - padding, high + padding]
     fig.add_trace(
         go.Heatmap(
-            x=deviation.index, y=y_range, z=[deviation.index.quarter] * 2,
+            x=quarters, y=y_range, z=[quarters.quarter] * 2,
             zmin=0.5, zmax=4.5, colorscale=band_colours,
             showscale=False, hoverinfo="skip",
         ),
         row=row, col=1,
     )
-    fig.add_trace(
-        go.Scatter(
-            x=deviation.index, y=deviation[city], mode="lines", name=city,
-            line={"color": "#08306b", "width": 1.5}, showlegend=False,
-            hovertemplate="Q%{x|%q %Y}<br>%{y:.1f}%",
-        ),
-        row=row, col=1,
-    )
+    for name, (data, colour) in LINES.items():
+        fig.add_trace(
+            go.Scatter(
+                x=data.index, y=data[city], mode="lines", name=name,
+                line={"color": colour, "width": 1.5},
+                legendgroup=name, legendrank=1, showlegend=row == 1,
+                hovertemplate="Q%{x|%q %Y}<br>%{y:.1f}%",
+            ),
+            row=row, col=1,
+        )
     fig.update_yaxes(range=y_range, row=row, col=1)
 fig.add_hline(y=0, line={"color": "black", "width": 0.8})
 
@@ -94,20 +100,20 @@ fig.update_xaxes(
 )
 # A fixed y-range makes dragging zoom along time only, keeping every panel's scale.
 fig.update_yaxes(
-    dtick=2, ticks="outside", showgrid=False, zeroline=False, showline=True,
+    nticks=5, ticks="outside", showgrid=False, zeroline=False, showline=True,
     linecolor="black", mirror=True, fixedrange=True,
 )
 fig.update_annotations(x=0, xanchor="left", font_size=14)
 fig.add_annotation(
-    text="Deviation from trend (%)", textangle=-90, showarrow=False,
+    text="Per cent", textangle=-90, showarrow=False,
     xref="paper", yref="paper", x=0, y=0.5, xshift=-45, font_size=14,
 )
 fig.update_layout(
-    height=1150, margin={"l": 60, "r": 10, "t": 60, "b": 50},
+    height=1150, margin={"l": 60, "r": 10, "t": 90, "b": 50},
     template="plotly_white",
     legend={
         "orientation": "h", "x": 0.5, "xanchor": "center", "y": 1, "yanchor": "top",
-        "yref": "container", "entrywidth": 90, "itemclick": False, "itemdoubleclick": False,
+        "yref": "container", "itemclick": False, "itemdoubleclick": False,
     },
 )
 fig.show(config={
@@ -117,12 +123,119 @@ fig.show(config={
 })
 
 display(Markdown(
-    "*Median price of established houses sold in each capital city, as a percentage above "
-    "or below its trend. The trend is a centred 4-quarter moving average, which smooths out "
+    "*Median price of established houses sold in each capital city: as a percentage above "
+    "or below its trend (blue), and as a percentage change from the previous quarter "
+    "(orange). The trend is a centred 4-quarter moving average, which smooths out "
     "seasonal swings and long-run price growth, so the first and last two quarters of the "
-    f"data cannot be shown (the chart ends in the {deviation.index.max():%B %Y} quarter). "
+    f"data have no trend (the blue line ends in the {deviation.index.max():%B %Y} quarter). "
     "Vertical scales differ by city. "
-    "Source: Australian Bureau of Statistics, Total Value of Dwellings, "
-    f"{RELEASE_LABEL} (cat. no. {CATALOGUE}), {TABLE}.*"
+    f"Source: {SOURCE}.*"
 ))
 ```
+
+## Is the pattern statistically significant?
+
+```{python}
+#| label: x13-tests
+#| echo: false
+
+from housing_seasonality import FACTORS_FILE, TESTS_FILE
+
+tests = pd.read_csv(TESTS_FILE).set_index("city").loc[CAPITALS]
+factors = pd.read_csv(FACTORS_FILE, parse_dates=["date"], index_col="date")[CAPITALS]
+by_quarter = factors.groupby(factors.index.quarter).mean().T
+QUARTER_NAMES = {1: "March", 2: "June", 3: "September", 4: "December"}
+
+
+def join(names):
+    names = list(names)
+    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
+
+
+def size(values):
+    """A percentage, or a range of them if the cities differ."""
+    lo, hi = f"{min(values):.1f}", f"{max(values):.1f}"
+    return f"{lo}%" if lo == hi else f"{lo}% to {hi}%"
+
+
+def swings(cities):
+    """Describe the dearest and cheapest quarters of a group of cities."""
+    group = by_quarter.loc[cities]
+    peak, trough = group.idxmax(axis=1), group.idxmin(axis=1)
+    if peak.nunique() == 1 and trough.nunique() == 1:
+        return (
+            f"{size(group.max(axis=1))} above the seasonally adjusted price in the "
+            f"{QUARTER_NAMES[peak.iloc[0]]} quarter and {size(-group.min(axis=1))} below it "
+            f"in the {QUARTER_NAMES[trough.iloc[0]]} quarter"
+        )
+    return (
+        f"up to {size(group.max(axis=1))} above the seasonally adjusted price and up to "
+        f"{size(-group.min(axis=1))} below it, peaking and bottoming in different quarters"
+    )
+
+
+# The two cities with the widest gap between their dearest and cheapest quarter.
+spread = by_quarter.max(axis=1) - by_quarter.min(axis=1)
+largest = [c for c in CAPITALS if c in spread.nlargest(2).index]
+others = [c for c in CAPITALS if c not in largest]
+
+passing = tests.index[tests["combined_test"] == "present"]
+passes = (
+    "Every city passes" if len(passing) == len(tests)
+    else f"{len(passing)} of {len(tests)} cities pass ({join(passing)})"
+)
+dearest = by_quarter.idxmax(axis=1)
+dearest_text = (
+    f"The {QUARTER_NAMES[dearest.iloc[0]]} quarter is the dearest everywhere."
+    if dearest.nunique() == 1
+    else "The dearest quarter varies by city."
+)
+
+display(Markdown(
+    "To test whether these swings are real seasonality rather than noise, I run each city's "
+    "prices through X-13ARIMA-SEATS, the seasonal adjustment program used by the US Census "
+    "Bureau and most statistical agencies, including the ABS. "
+    f"{passes} the program's combined test for identifiable seasonality. {dearest_text} "
+    f"{join(largest)} have the largest swings, {swings(largest)}. "
+    f"In the other capitals prices are {swings(others)}."
+))
+
+
+def p_value(p):
+    return "<0.001" if p < 0.001 else f"{p:.3f}"
+
+
+rows = [
+    "| City | Seasonality | Stable F (p) | Kruskal–Wallis (p) | Moving F (p) | M7 "
+    "| Mar | Jun | Sep | Dec |",
+    "|:--|:--|--:|--:|--:|--:|--:|--:|--:|--:|",
+]
+for city, t in tests.iterrows():
+    verdict = t["combined_test"].capitalize()
+    factor_cells = " | ".join(f"{by_quarter.loc[city, q]:+.1f}" for q in range(1, 5))
+    rows.append(
+        f"| {city} | {verdict} "
+        f"| {t['stable_f']:.1f} ({p_value(t['stable_p'])}) "
+        f"| {t['kruskal_wallis']:.1f} ({p_value(t['kruskal_wallis_p'])}) "
+        f"| {t['moving_f']:.2f} ({p_value(t['moving_p'])}) "
+        f"| {t['m7']:.2f} | {factor_cells} |"
+    )
+display(Markdown("\n".join(rows)))
+
+display(Markdown(
+    "*Seasonality tests and average seasonal factors for the median price of established "
+    "houses, by capital city. Seasonality is X-13ARIMA-SEATS's combined test for "
+    "identifiable seasonality. Stable F and Kruskal–Wallis test for a seasonal pattern that "
+    "is constant over time; Moving F tests whether it changes from year to year. M7 below 1 "
+    "means the seasonal pattern is stable enough to estimate reliably. Mar to Dec give the "
+    "average seasonal factor of each quarter, in per cent above or below the seasonally "
+    f"adjusted price, over {factors.index.min():%B %Y} to {factors.index.max():%B %Y}. "
+    f"Source: {SOURCE}; author's calculations.*"
+))
+```
+
+::: {.callout-note collapse="true"}
+## Method
+
+For each capital city, I run X-13ARIMA-SEATS (US Census Bureau, version 1.1) on the log of the median price. The program automatically selects a seasonal ARIMA model and detects outliers (one-off spikes, level shifts and temporary changes). It then estimates the seasonal factors with the X-11 filter. There are no trading-day adjustments, because the data are quarterly medians. As a cross-check, I fit the seasonal ARIMA order to the same log prices with `pmdarima`'s `auto_arima`, which chooses by BIC, the same criterion X-13 uses.
+:::

@@ -32,6 +32,21 @@ jobs:
       - name: Run ETL
         run: python etl/housing_prices.py
 
+      - name: Install X-13ARIMA-SEATS
+        run: |
+          mkdir -p "$RUNNER_TEMP/x13as"
+          curl -sSL https://www2.census.gov/software/x-13arima-seats/x13as/unix-linux/program-archives/x13as_ascii-v1-1-b62.tar.gz \
+            | tar -xz -C "$RUNNER_TEMP/x13as"
+          # statsmodels looks for an executable called x13as in X13PATH.
+          bin=$(find "$RUNNER_TEMP/x13as" -type f -name 'x13as*' ! -name '*.*' | head -n 1)
+          chmod +x "$bin"
+          dir=$(dirname "$bin")
+          [ "$(basename "$bin")" = x13as ] || ln -s "$bin" "$dir/x13as"
+          echo "X13PATH=$dir" >> "$GITHUB_ENV"
+
+      - name: Run seasonality analysis
+        run: python etl/housing_seasonality.py
+
       - name: Render site
         run: quarto render
 

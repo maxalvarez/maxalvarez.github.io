@@ -4,3 +4,18 @@
     pointer-events: none !important;
   }
 }
+
+/* Full-width photo at half the screen height; cover trims top and bottom instead of squashing it. */
+img.hero-image {
+  width: 100%;
+  height: 50vh;
+  object-fit: cover;
+  object-position: center 35%; /* keeps the SOLD sign in frame on wide screens */
+}
+
+/* On phones half the screen is taller than the photo, so show it whole instead. */
+@media (max-width: 767.98px) {
+  img.hero-image {
+    height: auto;
+  }
+}

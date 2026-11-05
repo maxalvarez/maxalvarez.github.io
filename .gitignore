@@ -1,5 +1,5 @@
 /.quarto/
-**/*.quarto_ipynb
+**/*.quarto_ipynb*
 *_files/
 Thumbs.db
 _site/

@@ -25,11 +25,24 @@ TABLE = "Table 2"
 _MONTH = calendar.month_name[QUARTER_MONTH]
 RELEASE_LABEL = f"{_MONTH} Quarter {YEAR}"
 _QUARTER_SLUG = f"{_MONTH[:3].lower()}-quarter-{YEAR}"
+PUBLICATION = "Total Value of Dwellings"
+# Citation used in figure and table captions.
+SOURCE = (
+    f"Australian Bureau of Statistics, {PUBLICATION}, {RELEASE_LABEL} "
+    f"(cat. no. {CATALOGUE}), {TABLE}"
+)
 URL = f"https://www.abs.gov.au/statistics/economy/price-indexes-and-inflation/total-value-dwellings/{_QUARTER_SLUG}/643202.xlsx"
 
 _ROOT = Path(__file__).parent.parent
 RAW_FILE = _ROOT / "data" / "raw" / "643202.xlsx"
 PROCESSED_FILE = _ROOT / "data" / "processed" / "housing_prices.csv"
+
+# Series analysed in the post, and the order cities are displayed in.
+MEASURE = "Median Price of Established House Transfers (Unstratified)"
+CAPITALS = [
+    "Sydney", "Melbourne", "Brisbane", "Adelaide",
+    "Perth", "Hobart", "Darwin", "Canberra",
+]
 
 # ABS Data1 layout: row 0 is the per-column title, data starts at row 10.
 TITLE_ROW = 0
@@ -69,6 +82,15 @@ def transform(df: pd.DataFrame) -> pd.DataFrame:
         f"{out['measure'].nunique()} measures and {out['region'].nunique()} regions"
     )
     return out
+
+
+def load_capitals() -> pd.DataFrame:
+    """Wide table of MEASURE from the processed CSV: one column per capital, in CAPITALS order."""
+    df = pd.read_csv(PROCESSED_FILE, parse_dates=["date"])
+    return (
+        df.loc[df["measure"] == MEASURE]
+          .pivot(index="date", columns="region", values="value")[CAPITALS]
+    )
 
 
 def load(df: pd.DataFrame, dest: Path) -> None:
