@@ -234,8 +234,162 @@ display(Markdown(
 ))
 ```
 
-::: {.callout-note collapse="true"}
-## Method
+## Appendix: methodology {.appendix}
 
-For each capital city, I run X-13ARIMA-SEATS (US Census Bureau, version 1.1) on the log of the median price. The program automatically selects a seasonal ARIMA model and detects outliers (one-off spikes, level shifts and temporary changes). It then estimates the seasonal factors with the X-11 filter. There are no trading-day adjustments, because the data are quarterly medians. As a cross-check, I fit the seasonal ARIMA order to the same log prices with `pmdarima`'s `auto_arima`, which chooses by BIC, the same criterion X-13 uses.
-:::
+We start by assuming the data generation process is the product of a trend $T_t$, a seasonal factor $S_t$ and an irregular part $I_t$ (noise). We estimate the seasonal factors using the US Census Bureau's X-13ARIMA-SEATS procedure on the log of each city's quarterly median price.
+
+### The model
+
+X-13 first describes the log price, $y_t$, with a model called regARIMA, which has two layers. The first captures one-off events, and the second models the rest of the series:
+
+$$
+y_t = \underbrace{\sum_k \beta_k x_{k,t}}_{\text{one-off events}} + \underbrace{z_t}_{\text{everything else}}.
+$$
+
+**The first layer** aims to capture outliers, such as a sudden spike or a permanent jump. Each regressor $x_{k,t}$ marks when outlier $k$ happens, and its coefficient $\beta_k$ measures how big the outlier is. X-13 looks for two types of outlier, each starting at some quarter $t_0$:
+
+| Outlier | Shape | Regressor |
+|:--|:--|:--|
+| Additive outlier (AO) | A one-quarter spike | $x_t = 1$ if $t = t_0$, otherwise $0$ |
+| Level shift (LS) | A permanent step | $x_t = -1$ if $t < t_0$, otherwise $0$ |
+
+For a level shift, $\beta_k$ is the size of the step: the log price is lower by $\beta_k$ in every quarter before $t_0$.
+
+**The second layer**, $z_t$ is the log price after removing the outliers, assumed to follow a seasonal ARIMA model. Written with the backshift operator $B$: $Bz_t = z_{t-1}$, and so $B^4 z_t = z_{t-4}$, the seasonal ARIMA model for $z_t$ is:
+
+$$
+\phi(B)\,\Phi(B^4)\,(1-B)^d\,(1-B^4)^D\, z_t = \theta(B)\,\Theta(B^4)\,\varepsilon_t.
+$$
+
+The $\phi$, $\Phi$, $\theta$ and $\Theta$ set how far back the model looks and how strong the link to past changes or surprises is. The polynomials $\phi, \Phi, \dots$ are written out as
+
+$$
+\begin{aligned}
+\phi(B) &= 1 - \phi_1 B - \dots - \phi_p B^p, &
+\Phi(B^4) &= 1 - \Phi_1 B^4 - \dots - \Phi_P B^{4P}, \\
+\theta(B) &= 1 - \theta_1 B - \dots - \theta_q B^q, &
+\Theta(B^4) &= 1 - \Theta_1 B^4 - \dots - \Theta_Q B^{4Q}.
+\end{aligned}
+$$
+
+$\varepsilon_t$ is the genuine surprise in each quarter: the part nothing in the past could predict. $\theta(B)$ and $\Theta(B^4)$ let part of last quarter's surprise, and of the surprise in the same quarter last year, carry into this quarter.
+
+The powers $d$ and $D$ count how many times the model takes the quarterly difference $(1-B)$ and the yearly difference $(1-B^4)$ until the resulting series is stationary, i.e., a series with the same average, variance and correlation between quarters over time. Stationarity is needed because the model's parameters are constant, so it can only describe a series whose properties are also constant. The quarterly difference turns the trend into quarterly growth, and the yearly difference turns a drifting seasonal pattern into small year-to-year changes.
+
+The orders $p$, $q$, $P$ and $Q$ count how many coefficients each polynomial has. A seasonal ARIMA model is labelled by its six orders, $(p\ d\ q)(P\ D\ Q)$.
+
+So, X-13 has four things to find: the outliers and their sizes $\beta_k$, the differencing orders $d$ and $D$, the polynomial orders $p$, $q$, $P$ and $Q$, and the coefficients themselves ($\phi_1$, $\Theta_1$ and so on). Steps 1 to 4 below describe how X-13 finds them, in the sequence it follows.
+
+### Step 1: Search for outliers
+
+X-13 starts by fitting a simple default model to the log price $y_t$, with no outliers yet. The default model is $(0\ 1\ 1)(0\ 1\ 1)$, known as the *airline model*:
+
+$$
+(1-B)(1-B^4)\,y_t = (1-\theta_1 B)(1-\Theta_1 B^4)\,\varepsilon_t.
+$$
+
+The two coefficients, $\theta_1$ and $\Theta_1$, are estimated by maximum likelihood. X-13 then searches for outliers using this default model:
+
+1. **List the candidates.** A candidate is one outlier type (AO or LS) starting at one particular quarter. A series of $N$ quarters has close to $2N$ candidates. Here, $N = 98$, so there are about 196 candidates.
+2. **Score each candidate.** For each candidate, its $\beta_k$ is computed as the value that the candidate's regressor would get if it were added to the default model, holding $\theta_1$ and $\Theta_1$ fixed. Then, we record its $t$-statistic.
+3. **Add the strongest candidate.** If the largest absolute $t$-statistic exceeds a critical value, the candidate's regressor is added to the default model and the model is re-estimated to update $\theta_1$, $\Theta_1$ and $\beta_k$.
+4. **Repeat.** X-13 repeats points 1 to 3 until no remaining candidate has a $t$-statistic above the critical value.
+5. **Re-check.** X-13 then removes, one at a time and starting with the least significant, each outlier it added whose $t$-statistic no longer exceeds the critical value.
+
+Finally, the outliers found are subtracted from the log price, which gives $y_t - \sum_k \beta_k x_{k,t}$, so the following steps work on this outlier-free log price series.
+
+### Step 2: The differencing orders $d$ and $D$
+
+X-13 now tests whether the outlier-free log price from Step 1 needs differencing to become stationary.
+
+It first fits an autoregressive model with two quarterly lags and one yearly lag, $(2\ 0\ 0)(1\ 0\ 0)$, to the outlier-free log price. It then computes the roots of the estimated polynomials $\phi(B)$ and $\Phi(B^4)$: the values of $B$ at which each polynomial equals zero. A root of exactly one, a *unit root*, means the autoregressive coefficients add up to one, so shocks never fade and the series is non-stationary. X-13 treats any root smaller than 1.042 in size as a unit root. For each such root it adds one difference: a quarterly difference for a root of $\phi(B)$, a yearly difference for a root of $\Phi(B^4)$.
+
+X-13 then differences the outlier-free log price accordingly and fits a model with one coefficient in each polynomial, $(1\ d\ 1)(1\ D\ 1)$. If the estimated $\phi_1$ or $\Phi_1$ is close to one, it adds another difference of the matching kind and fits the model again. This continues until no coefficient is close to one, up to a maximum of $d = 2$ and $D = 1$.
+
+### Step 3: The polynomial orders $p$, $q$, $P$ and $Q$
+
+With $d$ and $D$ fixed, X-13 fits a set of candidate seasonal ARIMA models to the outlier-free log price. The candidates have up to two coefficients in each quarterly polynomial ($p \le 2$, $q \le 2$) and up to one in each yearly polynomial ($P \le 1$, $Q \le 1$). For each candidate model, X-13 computes the BIC, a score that rewards a close fit and penalises extra coefficients. It keeps the candidate model with the lowest BIC.
+
+To avoid fitting every combination, X-13 searches in three passes: it chooses $P$ and $Q$ first, then $p$ and $q$, then $P$ and $Q$ again.
+
+### Step 4: Search for outliers again and settle the model
+
+If the model chosen in Step 3 differs from the default model, X-13 discards the outliers found in Step 1. It repeats the outlier search of Step 1 on the log price $y_t$, this time using the chosen model in place of the default model.
+
+X-13 then compares the chosen model with the default model. It looks at each model's residuals, which are the estimated surprises $\varepsilon_t$, and keeps the default model unless the chosen model's residuals are smaller or less correlated over time.
+
+Last, X-13 checks the model it kept once more for unit roots and for coefficients too small to matter, and estimates all the coefficients and the $\beta_k$ together by maximum likelihood. The result is the final regARIMA model.
+
+The final regARIMA model does two jobs for Step 5. It removes the outliers from the price series, so a one-off spike is not mistaken for seasonality. And it forecasts the price series one year ahead, so the moving averages in Step 5 have data to work with at the end of the sample. I don't adjust for trading days or moving holidays, because the data are quarterly medians, not sums of daily activity.
+
+### Step 5: Separate the seasonal factors with the X-11 filter
+
+X-11 splits the outlier-adjusted series into trend, seasonal and irregular parts by applying moving averages in turn. In outline:
+
+1. **First trend.** Estimate the trend with a centred 4-quarter (2×4) moving average, $T_t = \tfrac{1}{8}P_{t-2} + \tfrac{1}{4}(P_{t-1} + P_t + P_{t+1}) + \tfrac{1}{8}P_{t+2}$, which gives each quarter of the year equal weight, so a repeating seasonal pattern averages out.
+2. **Seasonal-irregular ratios.** Divide the series by that trend: $SI_t = P_t / T_t$. This leaves the seasonal factor times noise.
+3. **First seasonal factors.** For each quarter of the year separately (all the Marches, then all the Junes, and so on), smooth the $SI_t$ ratios across years with a 3×3 moving average. Then rescale the factors so that they average 1 over each year, using the 2×4 moving average again. Without that rescaling, seasonal adjustment would shift the level of prices.
+4. **First seasonal adjustment.** Divide the series by the seasonal factors: $A_t = P_t / S_t$.
+5. **Better trend.** Re-estimate the trend from $A_t$ with a Henderson moving average. This filter follows turning points more closely than a plain average. X-13 chooses its length automatically.
+6. **Final seasonal factors.** Repeat points 2 and 3 of this list with the better trend. X-13 picks the length of the seasonal moving average automatically, based on how noisy the series is relative to its seasonal pattern.
+
+At each round, X-11 also detects extreme values of the irregular part and gives them less weight, so they don't distort the seasonal factors.
+
+The result is a final seasonal factor $S_t$ for every quarter and the seasonally adjusted price $A_t = P_t / S_t$.
+
+### Step 6: Express the seasonal factors in per cent
+
+The quarterly columns in the table (Mar to Dec) show each seasonal factor as a percentage above or below the seasonally adjusted price:
+
+$$
+s_t = \left(\frac{P_t}{A_t} - 1\right) \times 100 = (S_t - 1) \times 100,
+$$
+
+averaged over every year of the sample for each quarter of the year. For example, a June value of $+1.5$ means that, on average, June-quarter prices are 1.5% above what they would be without seasonality.
+
+### Step 7: Test whether the seasonality is real
+
+X-13 runs its tests on the seasonal-irregular ratios $SI_t$ from the final round of X-11, grouped by quarter of the year. Let $k = 4$ quarters, $n_j$ the number of observations in quarter $j$, $n$ the total, $\bar{x}_j$ the mean of quarter $j$ and $\bar{x}$ the overall mean.
+
+**Stable F test.** A one-way analysis of variance. It asks whether the four quarter means differ by more than the noise within each quarter would explain:
+
+$$
+F_S = \frac{\sum_j n_j(\bar{x}_j - \bar{x})^2 \,/\, (k-1)}{\sum_j \sum_i (x_{ij} - \bar{x}_j)^2 \,/\, (n-k)}.
+$$
+
+Under the null hypothesis of no seasonality, $F_S$ follows an $F$ distribution with $k-1$ and $n-k$ degrees of freedom.
+
+**Kruskal–Wallis test.** The same question without assuming normally distributed noise. It ranks all $n$ ratios from smallest to largest and compares the rank sums $R_j$ of the quarters:
+
+$$
+H = \frac{12}{n(n+1)} \sum_j \frac{R_j^2}{n_j} - 3(n+1),
+$$
+
+which follows a $\chi^2$ distribution with $k-1$ degrees of freedom when there is no seasonality.
+
+**Moving F test.** A two-way analysis of variance on $|SI_t - 1|$, with years and quarters as the two factors. It asks whether the size of the seasonal swings changes from year to year:
+
+$$
+F_M = \frac{S_{\text{years}} \,/\, (N-1)}{S_{\text{residual}} \,/\, \big((N-1)(k-1)\big)},
+$$
+
+where $N$ is the number of years, $S_{\text{years}}$ is the sum of squares between years, and $S_{\text{residual}}$ is the residual sum of squares. Here a significant result is bad news: it means the pattern moves around, which makes it harder to pin down.
+
+**M7 statistic.** Compares the amount of moving seasonality with the amount of stable seasonality:
+
+$$
+M7 = \sqrt{\tfrac{1}{2}\left(\frac{7}{F_S} + \frac{3F_M}{F_S}\right)}.
+$$
+
+Values below 1 mean the stable pattern dominates, so the seasonal factors can be estimated reliably.
+
+**Combined test for identifiable seasonality.** X-13 combines the three tests into one verdict, following Lothian and Morry (1978). Write $T_1 = 7/F_S$ and $T_2 = 3F_M/F_S$, so that $M7^2 = (T_1 + T_2)/2$. Then:
+
+1. If the stable F test is not significant at the 0.1% level, seasonality is **not present**.
+2. If the moving F test is significant at the 5% level and $M7 \ge 1$, the pattern moves too much to identify, so seasonality is **not present**.
+3. If $T_1 \ge 1$ or $T_2 \ge 1$, or the Kruskal–Wallis test is not significant at the 0.1% level, seasonality is **probably not present**.
+4. Otherwise, seasonality is **present**.
+
+### Step 8: Cross-check the model
+
+As a check on Steps 2 to 4, I fit a seasonal ARIMA model to the same log prices with `pmdarima`'s `auto_arima`. It searches the model orders stepwise and chooses by BIC, the same criterion X-13 uses, and I compare its choice with X-13's. The two tools search different sets of models and handle outliers differently (`auto_arima` has no outlier regressors), so their choices need not match exactly.
