@@ -3,6 +3,8 @@ title: "Is there a better time in the year to buy a house in Australia?"
 date: 2026-10-31
 categories: [Housing Economics]
 description: "I want to know whether house prices in Australian capital cities are seasonal."
+bibliography: references.bib
+csl: apa.csl
 ---
 
 ::: {.column-screen}
@@ -11,7 +13,7 @@ description: "I want to know whether house prices in Australian capital cities a
 
 In this analysis, I explore whether there is a better time in the year to buy a house in Australia. I use median prices of established house sales from the Australian Bureau of Statistics. As a first step, I strip out long-run price growth to see how each city's prices move within the year, and set this against plain quarter-on-quarter growth.
 
-## House prices relative to trend and quarterly growth, capital cities
+## Visual inspection
 
 ```{python}
 #| label: capital-prices
@@ -139,7 +141,7 @@ display(Markdown(
 ))
 ```
 
-## Is the pattern statistically significant?
+## The formal statistical test
 
 ```{python}
 #| label: x13-tests
@@ -199,11 +201,14 @@ dearest_text = (
 
 display(Markdown(
     "To test whether these swings are real seasonality rather than noise, I run each city's "
-    "prices through X-13ARIMA-SEATS, the seasonal adjustment program used by the US Census "
-    "Bureau and most statistical agencies, including the ABS. "
+    "prices through X-13ARIMA-SEATS [@x13manual], the seasonal adjustment program used by "
+    "the US Census Bureau and most statistical agencies, including the ABS. "
     f"{passes} the program's combined test for identifiable seasonality. {dearest_text} "
     f"{join(largest)} have the largest swings, {swings(largest)}. "
-    f"In the other capitals prices are {swings(others)}."
+    f"In the other capitals prices are {swings(others)}. "
+    "An earlier study of the eight capitals, @valadkhani2015, used monthly prices and a "
+    "different method, and also found sizable seasonal effects, in the smallest capitals "
+    "(Darwin and Hobart) and the largest (Melbourne and Sydney)."
 ))
 
 
@@ -334,6 +339,8 @@ The final regARIMA model does two jobs for Step 5. First, it removes the outlier
 
 ### Step 5: Separate the seasonal factors with the X-11 filter
 
+Within the X-13 procedure, X-11, a seasonal adjustment method developed by the US Census Bureau in the 1960s [@shiskin1967], is applied to separate the seasonal pattern from the trend and the noise.
+
 X-11 splits the outlier-adjusted price, $P_t = e^{z_t}$, into trend $T_t$, seasonal $S_t$ and an irregular $I_t$ (noise) parts:
 
 1. **First trend.** Estimate the trend with a centred 4-quarter (2×4) moving average: $T_t = \tfrac{1}{8}P_{t-2} + \tfrac{1}{4}(P_{t-1} + P_t + P_{t+1}) + \tfrac{1}{8}P_{t+2}$.
@@ -360,57 +367,33 @@ The result is a final seasonal factor $S_t$ for every quarter and the seasonally
 
 ### Step 6: Express the seasonal factors in per cent
 
-The quarterly columns in the table (Mar to Dec) show each seasonal factor as a percentage above or below the seasonally adjusted price:
+Next, we express each seasonal factor as a percentage above or below the seasonally adjusted price:
 
 $$
 s_t = \left(\frac{P_t}{A_t} - 1\right) \times 100 = (S_t - 1) \times 100,
 $$
 
-averaged over every year of the sample for each quarter of the year. For example, a June value of $+1.5$ means that, on average, June-quarter prices are 1.5% above what they would be without seasonality.
+and we report the average of $s_t$ over every year of the sample, for each quarter of the year. @hu2026 use a similar approach for US house prices: they express the seasonal component in per cent and average it for each month of the year.
 
-### Step 7: Test whether the seasonality is real
+### Step 7: Test for statistically significant and stable seasonality
 
-X-13 runs its tests on the seasonal-irregular ratios $SI_t$ from the final round of X-11, grouped by quarter of the year. Let $k = 4$ quarters, $n_j$ the number of observations in quarter $j$, $n$ the total, $\bar{x}_j$ the mean of quarter $j$ and $\bar{x}$ the overall mean.
+X-13 tests the seasonal-irregular ratios $SI_t$ from the final round of X-11:
 
-**Stable F test.** A one-way analysis of variance. It asks whether the four quarter means differ by more than the noise within each quarter would explain:
+**Stable F** tests whether the differences between the four quarter means are statistically significant.
 
-$$
-F_S = \frac{\sum_j n_j(\bar{x}_j - \bar{x})^2 \,/\, (k-1)}{\sum_j \sum_i (x_{ij} - \bar{x}_j)^2 \,/\, (n-k)}.
-$$
+**Kruskal–Wallis** tests for statistically significant differences between the quarters, like the stable F test, but without assuming normally distributed residuals.
 
-Under the null hypothesis of no seasonality, $F_S$ follows an $F$ distribution with $k-1$ and $n-k$ degrees of freedom.
+**Moving F** tests whether the seasonal pattern changes from year to year. A significant result means the pattern is unstable.
 
-**Kruskal–Wallis test.** The same question without assuming normally distributed noise. It ranks all $n$ ratios from smallest to largest and compares the rank sums $R_j$ of the quarters:
+**M7 statistic** also measures stability, but by comparing the amount of moving seasonality with the amount of stable seasonality. Values below 1 mean the stable pattern dominates, so the seasonal factors can be estimated reliably.
 
-$$
-H = \frac{12}{n(n+1)} \sum_j \frac{R_j^2}{n_j} - 3(n+1),
-$$
-
-which follows a $\chi^2$ distribution with $k-1$ degrees of freedom when there is no seasonality.
-
-**Moving F test.** A two-way analysis of variance on $|SI_t - 1|$, with years and quarters as the two factors. It asks whether the size of the seasonal swings changes from year to year:
-
-$$
-F_M = \frac{S_{\text{years}} \,/\, (N-1)}{S_{\text{residual}} \,/\, \big((N-1)(k-1)\big)},
-$$
-
-where $N$ is the number of years, $S_{\text{years}}$ is the sum of squares between years, and $S_{\text{residual}}$ is the residual sum of squares. Here a significant result is bad news: it means the pattern moves around, which makes it harder to pin down.
-
-**M7 statistic.** Compares the amount of moving seasonality with the amount of stable seasonality:
-
-$$
-M7 = \sqrt{\tfrac{1}{2}\left(\frac{7}{F_S} + \frac{3F_M}{F_S}\right)}.
-$$
-
-Values below 1 mean the stable pattern dominates, so the seasonal factors can be estimated reliably.
-
-**Combined test for identifiable seasonality.** X-13 combines the three tests into one verdict, following Lothian and Morry (1978). Write $T_1 = 7/F_S$ and $T_2 = 3F_M/F_S$, so that $M7^2 = (T_1 + T_2)/2$. Then:
+**Test for identifiable (significant and stable) seasonality** combines the tests above into one verdict:
 
 1. If the stable F test is not significant at the 0.1% level, seasonality is **not present**.
 2. If the moving F test is significant at the 5% level and $M7 \ge 1$, the pattern moves too much to identify, so seasonality is **not present**.
-3. If $T_1 \ge 1$ or $T_2 \ge 1$, or the Kruskal–Wallis test is not significant at the 0.1% level, seasonality is **probably not present**.
+3. If the stable F is 7 or less, or the moving F is at least a third of the stable F, or the Kruskal–Wallis test is not significant at the 0.1% level, seasonality is **probably not present**.
 4. Otherwise, seasonality is **present**.
 
 ### Step 8: Cross-check the model
 
-As a check on Steps 2 to 4, I fit a seasonal ARIMA model to the same log prices with `pmdarima`'s `auto_arima`. It searches the model orders stepwise and chooses by BIC, the same criterion X-13 uses, and I compare its choice with X-13's. The two tools search different sets of models and handle outliers differently (`auto_arima` has no outlier regressors), so their choices need not match exactly.
+As a check on Steps 2 to 4, we fit a seasonal ARIMA model to the same log prices with `pmdarima`'s `auto_arima`. It searches the model orders stepwise and chooses by BIC, the same criterion X-13 uses, and we compare its choice with X-13's. The two tools search different sets of models and handle outliers differently (`auto_arima` has no outlier regressors), so their choices need not match exactly.
