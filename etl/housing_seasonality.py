@@ -4,8 +4,7 @@ X-13ARIMA-SEATS seasonality analysis of capital-city median house prices.
 For each capital, runs the US Census Bureau's X-13ARIMA-SEATS program (through
 statsmodels) on log median prices: automatic SARIMA selection, automatic outlier
 detection and the X-11 seasonal filter. Records the seasonality tests X-13
-reports and the seasonal factors by quarter. pmdarima's auto_arima is fitted to
-the same log series as a cross-check of the SARIMA order X-13 chooses.
+reports and the seasonal factors by quarter.
 
 Needs the x13as binary: set the X13PATH environment variable to the folder that
 holds x13as (or x13as.exe). Run after etl/housing_prices.py.
@@ -13,11 +12,9 @@ holds x13as (or x13as.exe). Run after etl/housing_prices.py.
 
 import os
 import re
-import warnings
 
 import numpy as np
 import pandas as pd
-import pmdarima as pm
 from statsmodels.tsa.x13 import x13_arima_analysis
 
 from housing_prices import CAPITALS, PROCESSED_FILE, load_capitals
@@ -33,11 +30,6 @@ transform{function=log}
 outlier{}
 automdl{maxorder=(2 1) maxdiff=(2 1)}
 x11{print=all save=(d11 d12 d13)}"""
-
-
-def _full_order(order: str) -> str:
-    """A model with no seasonal ARIMA terms prints as "(p d q)" only; add "(0 0 0)"."""
-    return order if order.count("(") == 2 else order + "(0 0 0)"
 
 
 def parse_output(text: str) -> dict:
@@ -62,7 +54,7 @@ def parse_output(text: str) -> dict:
     m7 = re.search(r"M7\s*=\s*([\d.]+)", text)
 
     return {
-        "x13_model": _full_order(model.group(1).strip()) if model else None,
+        "x13_model": model.group(1).strip() if model else None,
         "outliers": " ".join(outliers),
         "stable_f": stable_f, "stable_p": stable_p,
         "kruskal_wallis": kw, "kruskal_wallis_p": kw_p,
@@ -76,17 +68,6 @@ def parse_output(text: str) -> dict:
     }
 
 
-def pmdarima_order(y: pd.Series) -> str:
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        fit = pm.auto_arima(
-            np.log(y), seasonal=True, m=4, information_criterion="bic",
-            stepwise=True, suppress_warnings=True, error_action="ignore",
-        )
-    (p, d, q), (sp, sd, sq, _) = fit.order, fit.seasonal_order
-    return f"({p} {d} {q})({sp} {sd} {sq})"
-
-
 def run_city(y: pd.Series) -> tuple[dict, pd.Series]:
     """Run X-13 on one city's price series (quarterly PeriodIndex).
 
@@ -94,7 +75,6 @@ def run_city(y: pd.Series) -> tuple[dict, pd.Series]:
     """
     res = x13_arima_analysis(y, rawspec=SPEC)
     tests = parse_output(res.results)
-    tests["pmdarima_model"] = pmdarima_order(y)
     factors = (y / res.seasadj - 1) * 100
     return tests, factors
 

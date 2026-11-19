@@ -1,5 +1,5 @@
 ---
-title: "Is there a better time in the year to buy a house in Australia?"
+title: "Is there a best and worst time in the year to buy or sell a house in Australia?"
 date: 2026-10-31
 categories: [Housing Economics]
 description: "I want to know whether house prices in Australian capital cities are seasonal."
@@ -11,7 +11,7 @@ csl: apa.csl
 ![Real estate boards in Rosanna, Melbourne, in 2026: one townhouse sold at a winter auction, the one next door is up for auction in spring.](images/melbourne_auction_2026.jpeg){.hero-image fig-alt="Two real estate agents' boards outside neighbouring townhouses in Rosanna, Melbourne. One is marked sold after an August auction; the other is still for sale."}
 :::
 
-In this analysis, I explore whether there is a better time in the year to buy a house in Australia. I use median prices of established house sales from the Australian Bureau of Statistics. As a first step, I strip out long-run price growth to see how each city's prices move within the year, and set this against plain quarter-on-quarter growth.
+In this analysis, I explore whether there is a best and worst time in the year to buy or sell a house in Australia. I use median prices of established house sales from the Australian Bureau of Statistics. As a first step, I strip out long-run price growth to see how each city's prices move within the year, and set this against plain quarter-on-quarter growth.
 
 ## Visual inspection
 
@@ -160,10 +160,20 @@ def join(names):
     return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
 
 
+def span(values, fmt):
+    """One formatted value, or a range of them if the cities differ."""
+    lo, hi = fmt.format(min(values)), fmt.format(max(values))
+    return lo if lo == hi else f"{lo} to {hi}"
+
+
 def size(values):
-    """A percentage, or a range of them if the cities differ."""
-    lo, hi = f"{min(values):.1f}", f"{max(values):.1f}"
-    return f"{lo}%" if lo == hi else f"{lo}% to {hi}%"
+    return span(values, "{:.1f}%")
+
+
+def signed(value):
+    """A percentage with its sign, but plain "0.0" when it rounds to zero."""
+    value = round(value, 1) + 0.0  # + 0.0 turns -0.0 into 0.0
+    return "0.0" if value == 0 else f"{value:+.1f}"
 
 
 def swings(cities):
@@ -199,6 +209,15 @@ dearest_text = (
     else "The dearest quarter varies by city."
 )
 
+# Quarters each city's X-13 run covered, quoted in appendix Step 1.
+lengths = factors.notna().sum()
+n_quarters = span(lengths, "{:.0f}")
+series_length = (
+    f"each city's series has {n_quarters} quarters" if lengths.nunique() == 1
+    else f"the cities' series have {n_quarters} quarters"
+)
+n_candidates = span(2 * lengths, "{:.0f}")
+
 display(Markdown(
     "To test whether these swings are real seasonality rather than noise, I run each city's "
     "prices through X-13ARIMA-SEATS [@x13manual], the seasonal adjustment program used by "
@@ -212,42 +231,30 @@ display(Markdown(
 ))
 
 
-def p_value(p):
-    return "<0.001" if p < 0.001 else f"{p:.3f}"
-
-
 rows = [
-    "| City | Seasonality | Stable F (p) | Kruskal–Wallis (p) | Moving F (p) | M7 "
-    "| Mar | Jun | Sep | Dec |",
-    "|:--|:--|--:|--:|--:|--:|--:|--:|--:|--:|",
+    "| City | Seasonality | Q1 | Q2 | Q3 | Q4 |",
+    "|:--|:--|--:|--:|--:|--:|",
 ]
 for city, t in tests.iterrows():
-    verdict = t["combined_test"].capitalize()
-    factor_cells = " | ".join(f"{by_quarter.loc[city, q]:+.1f}" for q in range(1, 5))
-    rows.append(
-        f"| {city} | {verdict} "
-        f"| {t['stable_f']:.1f} ({p_value(t['stable_p'])}) "
-        f"| {t['kruskal_wallis']:.1f} ({p_value(t['kruskal_wallis_p'])}) "
-        f"| {t['moving_f']:.2f} ({p_value(t['moving_p'])}) "
-        f"| {t['m7']:.2f} | {factor_cells} |"
-    )
+    factor_cells = " | ".join(signed(by_quarter.loc[city, q]) for q in range(1, 5))
+    # A missing verdict (X-13 output not parsed) shows as "n/a" rather than breaking the build.
+    verdict = t["combined_test"].capitalize() if pd.notna(t["combined_test"]) else "n/a"
+    rows.append(f"| {city} | {verdict} | {factor_cells} |")
 display(Markdown("\n".join(rows)))
 
 display(Markdown(
-    "*Seasonality tests and average seasonal factors for the median price of established "
-    "houses, by capital city. Seasonality is X-13ARIMA-SEATS's combined test for "
-    "identifiable seasonality. Stable F and Kruskal–Wallis test for a seasonal pattern that "
-    "is constant over time; Moving F tests whether it changes from year to year. M7 below 1 "
-    "means the seasonal pattern is stable enough to estimate reliably. Mar to Dec give the "
-    "average seasonal factor of each quarter, in per cent above or below the seasonally "
-    f"adjusted price, over {factors.index.min():%B %Y} to {factors.index.max():%B %Y}. "
+    "*Seasonality and average seasonal factors for the median price of established houses, "
+    "by capital city. Seasonality is X-13ARIMA-SEATS's combined test for identifiable "
+    "seasonality (see the appendix). Q1 to Q4 give the average seasonal factor of each "
+    "quarter (Q1 is the March quarter, Q4 the December quarter), in per cent above or below the seasonally adjusted price, over "
+    f"{factors.index.min():%B %Y} to {factors.index.max():%B %Y}. "
     f"Source: {SOURCE}; author's calculations.*"
 ))
 ```
 
 ## Appendix: methodology {.appendix}
 
-We estimate the seasonal factors using the US Census Bureau's X-13ARIMA-SEATS procedure on the log of each city's quarterly median price.
+I estimate the seasonal factors using the US Census Bureau's X-13ARIMA-SEATS procedure on the log of each city's quarterly median price.
 
 ### The model
 
@@ -303,8 +310,8 @@ $$
 
 The two coefficients, $\theta_1$ and $\Theta_1$, are estimated by maximum likelihood. X-13 then searches for outliers using this default model:
 
-1. **List the candidates.** A candidate is one outlier type (AO or LS) starting at one particular quarter. A series of $N$ quarters has close to $2N$ candidates. Here, $N = 98$, so there are about 196 candidates.
-2. **Score each candidate.** For each candidate, its $\beta_k$ is computed as the value that the candidate's regressor would get if it were added to the default model, holding $\theta_1$ and $\Theta_1$ fixed. Then, we record its $t$-statistic.
+1. **List the candidates.** A candidate is one outlier type (AO or LS) starting at one particular quarter. A series of $N$ quarters has close to $2N$ candidates. Here, `{python} series_length`, so there are about `{python} n_candidates` candidates.
+2. **Score each candidate.** For each candidate, its $\beta_k$ is computed as the value that the candidate's regressor would get if it were added to the default model, holding $\theta_1$ and $\Theta_1$ fixed. Then, X-13 records its $t$-statistic.
 3. **Add the strongest candidate.** If the largest absolute $t$-statistic exceeds a critical value, the candidate's regressor is added to the default model and the model is re-estimated to update $\theta_1$, $\Theta_1$ and $\beta_k$.
 4. **Repeat.** X-13 repeats points 1 to 3 until no remaining candidate has a $t$-statistic above the critical value.
 5. **Re-check.** X-13 then removes, one at a time and starting with the least significant, each outlier it added whose $t$-statistic no longer exceeds the critical value.
@@ -367,13 +374,13 @@ The result is a final seasonal factor $S_t$ for every quarter and the seasonally
 
 ### Step 6: Express the seasonal factors in per cent
 
-Next, we express each seasonal factor as a percentage above or below the seasonally adjusted price:
+Next, I express each seasonal factor as a percentage above or below the seasonally adjusted price:
 
 $$
 s_t = \left(\frac{P_t}{A_t} - 1\right) \times 100 = (S_t - 1) \times 100,
 $$
 
-and we report the average of $s_t$ over every year of the sample, for each quarter of the year. @hu2026 use a similar approach for US house prices: they express the seasonal component in per cent and average it for each month of the year.
+and I report the average of $s_t$ over every year of the sample, for each quarter of the year. @hu2026 use a similar approach for US house prices: they express the seasonal component in per cent and average it for each month of the year.
 
 ### Step 7: Test for statistically significant and stable seasonality
 
@@ -393,7 +400,3 @@ X-13 tests the seasonal-irregular ratios $SI_t$ from the final round of X-11:
 2. If the moving F test is significant at the 5% level and $M7 \ge 1$, the pattern moves too much to identify, so seasonality is **not present**.
 3. If the stable F is 7 or less, or the moving F is at least a third of the stable F, or the Kruskal–Wallis test is not significant at the 0.1% level, seasonality is **probably not present**.
 4. Otherwise, seasonality is **present**.
-
-### Step 8: Cross-check the model
-
-As a check on Steps 2 to 4, we fit a seasonal ARIMA model to the same log prices with `pmdarima`'s `auto_arima`. It searches the model orders stepwise and chooses by BIC, the same criterion X-13 uses, and we compare its choice with X-13's. The two tools search different sets of models and handle outliers differently (`auto_arima` has no outlier regressors), so their choices need not match exactly.

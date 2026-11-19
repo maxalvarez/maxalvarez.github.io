@@ -3,4 +3,3 @@ openpyxl
 jupyter
 plotly
 statsmodels
-pmdarima
