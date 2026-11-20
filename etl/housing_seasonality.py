@@ -1,8 +1,9 @@
 """
-X-13ARIMA-SEATS seasonality analysis of capital-city median house prices.
+X-13ARIMA-SEATS seasonality analysis of capital-city median dwelling prices.
 
-For each capital, runs the US Census Bureau's X-13ARIMA-SEATS program (through
-statsmodels) on log median prices: automatic SARIMA selection, automatic outlier
+For each capital and dwelling type (established houses and attached dwellings),
+runs the US Census Bureau's X-13ARIMA-SEATS program (through statsmodels) on
+log median prices: automatic SARIMA selection, automatic outlier
 detection and the X-11 seasonal filter. Records the seasonality tests X-13
 reports and the seasonal factors by quarter.
 
@@ -17,7 +18,7 @@ import numpy as np
 import pandas as pd
 from statsmodels.tsa.x13 import x13_arima_analysis
 
-from housing_prices import CAPITALS, PROCESSED_FILE, load_capitals
+from housing_prices import CAPITALS, DWELLINGS, PROCESSED_FILE, load_capitals
 
 TESTS_FILE = PROCESSED_FILE.parent / "housing_x13_tests.csv"
 FACTORS_FILE = PROCESSED_FILE.parent / "housing_x13_factors.csv"
@@ -85,20 +86,24 @@ def main() -> None:
             "X13PATH is not set. Point it at the folder holding the Census Bureau's "
             "x13as binary (https://www.census.gov/data/software/x13as.html)."
         )
-    prices = load_capitals()
-    prices.index = pd.PeriodIndex(prices.index, freq="Q")
-
     tests, factors = [], []
-    for city in CAPITALS:
-        print(f"Running X-13 for {city}")
-        result, factor = run_city(prices[city].dropna())
-        tests.append({"city": city, **result})
-        factors.append(factor.rename(city))
+    for dwelling in DWELLINGS:
+        prices = load_capitals(dwelling)
+        prices.index = pd.PeriodIndex(prices.index, freq="Q")
+        by_city = []
+        for city in CAPITALS:
+            print(f"Running X-13 for {city}, {dwelling.lower()}")
+            result, factor = run_city(prices[city].dropna())
+            tests.append({"dwelling": dwelling, "city": city, **result})
+            by_city.append(factor.rename(city))
+        by_city = pd.concat(by_city, axis=1)
+        # Same date convention as the processed prices: first day of the quarter's last month.
+        by_city.index = by_city.index.asfreq("M", "end").to_timestamp().rename("date")
+        factors.append(by_city.assign(dwelling=dwelling).set_index("dwelling", append=True))
 
     tests = pd.DataFrame(tests)
-    factors = pd.concat(factors, axis=1)
-    # Same date convention as the processed prices: first day of the quarter's last month.
-    factors.index = factors.index.asfreq("M", "end").to_timestamp().rename("date")
+    # One row per (date, dwelling), one column per capital.
+    factors = pd.concat(factors).sort_index()
 
     tests.to_csv(TESTS_FILE, index=False)
     factors.to_csv(FACTORS_FILE)

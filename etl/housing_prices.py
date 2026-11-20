@@ -37,8 +37,11 @@ _ROOT = Path(__file__).parent.parent
 RAW_FILE = _ROOT / "data" / "raw" / "643202.xlsx"
 PROCESSED_FILE = _ROOT / "data" / "processed" / "housing_prices.csv"
 
-# Series analysed in the post, and the order cities are displayed in.
-MEASURE = "Median Price of Established House Transfers (Unstratified)"
+# Series analysed in the post, keyed by dwelling type, and the order cities are displayed in.
+DWELLINGS = {
+    "Established houses": "Median Price of Established House Transfers (Unstratified)",
+    "Attached dwellings": "Median Price of Attached Dwelling Transfers (Unstratified)",
+}
 CAPITALS = [
     "Sydney", "Melbourne", "Brisbane", "Adelaide",
     "Perth", "Hobart", "Darwin", "Canberra",
@@ -84,11 +87,11 @@ def transform(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def load_capitals() -> pd.DataFrame:
-    """Wide table of MEASURE from the processed CSV: one column per capital, in CAPITALS order."""
+def load_capitals(dwelling: str) -> pd.DataFrame:
+    """Wide table of one DWELLINGS series from the processed CSV: one column per capital, in CAPITALS order."""
     df = pd.read_csv(PROCESSED_FILE, parse_dates=["date"])
     return (
-        df.loc[df["measure"] == MEASURE]
+        df.loc[df["measure"] == DWELLINGS[dwelling]]
           .pivot(index="date", columns="region", values="value")[CAPITALS]
     )
 

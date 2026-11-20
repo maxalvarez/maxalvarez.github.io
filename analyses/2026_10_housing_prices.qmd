@@ -1,8 +1,8 @@
 ---
-title: "Is there a best and worst time in the year to buy or sell a house in Australia?"
+title: "Is there a best and worst time in the year to buy or sell a residential property in Australia?"
 date: 2026-10-31
 categories: [Housing Economics]
-description: "I want to know whether house prices in Australian capital cities are seasonal."
+description: "Understanding residential property price seasonality helps both buyers and sellers strategise when to make an offer or list a home to buy cheaper and sell more expensive."
 bibliography: references.bib
 csl: apa.csl
 ---
@@ -11,7 +11,11 @@ csl: apa.csl
 ![Real estate boards in Rosanna, Melbourne, in 2026: one townhouse sold at a winter auction, the one next door is up for auction in spring.](images/melbourne_auction_2026.jpeg){.hero-image fig-alt="Two real estate agents' boards outside neighbouring townhouses in Rosanna, Melbourne. One is marked sold after an August auction; the other is still for sale."}
 :::
 
-In this analysis, I explore whether there is a best and worst time in the year to buy or sell a house in Australia. I use median prices of established house sales from the Australian Bureau of Statistics. As a first step, I strip out long-run price growth to see how each city's prices move within the year, and set this against plain quarter-on-quarter growth.
+This year, I entered the property market for the first time. While attending inspections, auctions, and, in some cases, making offers, I wondered whether there was a more convenient season to buy. I thought of that, obviously, alongside all other factors that can determine the price of a specific dwelling and overall property market trends. To learn about housing price seasonality, I decided to analyse median prices over time of established house and attached dwellings (townhouses, apartments) sales published by the ABS. I included all capital cities despite just wanting to buy in Melbourne because I also wanted to know whether seasonality was present only in some cities and, if it was present in more than one city, whether their seasonality differed. The latter could be due to differences in cities' weather seasonality. For example, Brisbane's relatively mild and short winter compared to Melbourne's.
+
+Of course, I am not the first to examine seasonality in housing prices, not even in Australia. @valadkhani2015, for instance, analysed monthly price seasonality in the eight capital cities from 1995 to 2015, separating houses and apartments. They found noticeable seasonality in all cities, more pronounced in houses than apartments. Regarding which months were the most and least expensive, their findings are difficult to distil into a single headline; however, they tend to suggest that summers were more expensive and spring cheaper in most cities. Yet, I do think this topic deserves a revisit. Not only to capture the COVID and post-COVID period, which severely impacted the property market through border closures and accelerating remote working, but also because of the latest fall in housing prices linked to recent tax changes coupled with rising interest rates.
+
+The rest of the post is organised as follows. The next section presents the data and provides a visual inspection of house prices over time. Then, I present the results of the formal statistical analysis of seasonality, identifying what the most and least expensive seasons are in each city. Next, I discuss limitations and implications for prospective buyers and seller strategies. Finally, I include an appendix explaining the methodology used to identify seasonality.
 
 ## Visual inspection
 
@@ -27,19 +31,22 @@ from IPython.display import HTML, Markdown, display
 from plotly.subplots import make_subplots
 
 sys.path.insert(0, "../etl")
-from housing_prices import SOURCE, CAPITALS, load_capitals
+from housing_prices import SOURCE, CAPITALS, DWELLINGS, load_capitals
 
-series = load_capitals()
-
-# Percentage deviation from a centred 4-quarter moving average (2x4 MA). Unlike an annual
-# mean, this also removes the within-year drift, which would otherwise read as seasonality.
-# It needs two quarters either side, so each end of the sample loses two.
-trend = series.rolling(4).mean().rolling(2).mean().shift(-2)
-deviation = ((series / trend - 1) * 100).dropna()
-# Quarter-on-quarter growth needs only the previous quarter, so it runs further at both ends.
-growth = (series.pct_change(fill_method=None) * 100).dropna(how="all")
-# The quarter bands span every quarter that has either line.
-quarters = growth.index.union(deviation.index)
+deviation, growth = {}, {}
+for dwelling in DWELLINGS:
+    series = load_capitals(dwelling)
+    # Percentage deviation from a centred 4-quarter moving average (2x4 MA). Unlike an annual
+    # mean, this also removes the within-year drift, which would otherwise read as seasonality.
+    # It needs two quarters either side, so each end of the sample loses two.
+    trend = series.rolling(4).mean().rolling(2).mean().shift(-2)
+    deviation[dwelling] = ((series / trend - 1) * 100).dropna(how="all")
+    # Quarter-on-quarter growth needs only the previous quarter, so it runs further at both ends.
+    growth[dwelling] = (series.pct_change(fill_method=None) * 100).dropna(how="all")
+# The quarter bands span every quarter that has any line.
+quarters = growth["Established houses"].index
+for frame in [*growth.values(), *deviation.values()]:
+    quarters = quarters.union(frame.index)
 
 LINES = {
     "Deviation from trend": (deviation, "#08306b"),
@@ -57,39 +64,60 @@ band_colours = [
     for bound in (i / 4, (i + 1) / 4)
 ]
 
+FIG_HEIGHT = 1180  # pixels
+
+# Houses on the left, attached dwellings on the right. Each city's row shares one vertical
+# scale, so the two dwelling types' swings can be compared directly.
 fig = make_subplots(
-    rows=8, cols=1, shared_xaxes=True, vertical_spacing=0.03, subplot_titles=CAPITALS,
+    rows=8, cols=2, shared_xaxes="all", vertical_spacing=0.03, horizontal_spacing=0.04,
+    # The city name sits once per row, over the left panel; the columns get their own headings.
+    subplot_titles=[title for city in CAPITALS for title in (city, "")],
 )
+# Left-align each city name with its panel (make_subplots centres them).
+half_width = (fig.layout.xaxis.domain[1] - fig.layout.xaxis.domain[0]) / 2
+fig.for_each_annotation(lambda a: a.update(x=a.x - half_width, xanchor="left", font_size=14))
+# Column headings, centred over each column, above the first row's city name.
+for col, dwelling in enumerate(DWELLINGS, start=1):
+    domain = fig.layout[f"xaxis{'' if col == 1 else col}"].domain
+    fig.add_annotation(
+        text=f"<b>{dwelling}</b>", showarrow=False, font_size=15,
+        xref="paper", yref="paper", x=sum(domain) / 2, y=1,
+        xanchor="center", yanchor="bottom", yshift=24,
+    )
 for row, city in enumerate(CAPITALS, start=1):
-    both = pd.concat([deviation[city], growth[city]])
-    low, high = both.min(), both.max()
+    every_line = pd.concat([data[d][city] for data, _ in LINES.values() for d in DWELLINGS])
+    low, high = every_line.min(), every_line.max()
     padding = 0.05 * (high - low)
     y_range = [low - padding, high + padding]
-    fig.add_trace(
-        go.Heatmap(
-            x=quarters, y=y_range, z=[quarters.quarter] * 2,
-            zmin=0.5, zmax=4.5, colorscale=band_colours,
-            showscale=False, hoverinfo="skip",
-        ),
-        row=row, col=1,
-    )
-    for name, (data, colour) in LINES.items():
+    for col, dwelling in enumerate(DWELLINGS, start=1):
         fig.add_trace(
-            go.Scatter(
-                x=data.index, y=data[city], mode="lines", name=name,
-                line={"color": colour, "width": 1.5},
-                legendgroup=name, legendrank=1, showlegend=row == 1,
-                hovertemplate="Q%{x|%q %Y}<br>%{y:.1f}%",
+            go.Heatmap(
+                x=quarters, y=y_range, z=[quarters.quarter] * 2,
+                zmin=0.5, zmax=4.5, colorscale=band_colours,
+                showscale=False, hoverinfo="skip",
             ),
-            row=row, col=1,
+            row=row, col=col,
         )
-    fig.update_yaxes(range=y_range, row=row, col=1)
+        for name, (data, colour) in LINES.items():
+            fig.add_trace(
+                go.Scatter(
+                    x=data[dwelling].index, y=data[dwelling][city], mode="lines", name=name,
+                    line={"color": colour, "width": 1.5},
+                    legendgroup=name, legendrank=1, showlegend=row == 1 and col == 1,
+                    hovertemplate="Q%{x|%q %Y}<br>%{y:.1f}%",
+                ),
+                row=row, col=col,
+            )
+        fig.update_yaxes(range=y_range, row=row, col=col)
+    # The right panel shares the left panel's scale, so its tick labels would only repeat.
+    fig.update_yaxes(showticklabels=False, row=row, col=2)
 fig.add_hline(y=0, line={"color": "black", "width": 0.8})
 
-# Empty traces supply the quarter legend, because the heatmaps have no legend entries.
+# Empty traces supply the quarter legend, because the heatmaps have no legend entries. They go
+# in a second legend, under the one for the lines.
 for label, shade in QUARTER_BANDS.items():
     fig.add_trace(go.Scatter(
-        x=[None], y=[None], mode="markers", name=label,
+        x=[None], y=[None], mode="markers", name=label, legend="legend2",
         marker={
             "symbol": "square", "size": 13, "color": shade,
             "line": {"color": "#999999", "width": 1},
@@ -105,17 +133,21 @@ fig.update_yaxes(
     nticks=5, ticks="outside", showgrid=False, zeroline=False, showline=True,
     linecolor="black", mirror=True, fixedrange=True,
 )
-fig.update_annotations(x=0, xanchor="left", font_size=14)
 fig.add_annotation(
     text="Per cent", textangle=-90, showarrow=False,
     xref="paper", yref="paper", x=0, y=0.5, xshift=-45, font_size=14,
 )
 fig.update_layout(
-    height=1150, margin={"l": 60, "r": 10, "t": 90, "b": 50},
+    height=FIG_HEIGHT, margin={"l": 60, "r": 10, "t": 120, "b": 50},
     template="plotly_white",
     legend={
         "orientation": "h", "x": 0.5, "xanchor": "center", "y": 1, "yanchor": "top",
         "yref": "container", "itemclick": False, "itemdoubleclick": False,
+    },
+    # About 28 pixels below the top of the figure, so it sits under the first legend.
+    legend2={
+        "orientation": "h", "x": 0.5, "xanchor": "center", "y": 1 - 28 / FIG_HEIGHT,
+        "yanchor": "top", "yref": "container", "itemclick": False, "itemdoubleclick": False,
     },
 )
 # Written out as HTML rather than with fig.show(): Plotly's notebook renderer always loads its
@@ -131,12 +163,14 @@ display(HTML(fig.to_html(
 )))
 
 display(Markdown(
-    "*Median price of established houses sold in each capital city: as a percentage above "
+    "*Median price of established houses (left) and attached dwellings, such as units, "
+    "apartments and townhouses (right), sold in each capital city: as a percentage above "
     "or below its trend (blue), and as a percentage change from the previous quarter "
     "(orange). The trend is a centred 4-quarter moving average, which smooths out "
     "seasonal swings and long-run price growth, so the first and last two quarters of the "
-    f"data have no trend (the blue line ends in the {deviation.index.max():%B %Y} quarter). "
-    "Vertical scales differ by city. "
+    "data have no trend (the blue line ends in the "
+    f"{deviation['Established houses'].index.max():%B %Y} quarter). "
+    "Vertical scales differ by city but are the same for both dwelling types in a city. "
     f"Source: {SOURCE}.*"
 ))
 ```
@@ -149,9 +183,16 @@ display(Markdown(
 
 from housing_seasonality import FACTORS_FILE, TESTS_FILE
 
-tests = pd.read_csv(TESTS_FILE).set_index("city").loc[CAPITALS]
-factors = pd.read_csv(FACTORS_FILE, parse_dates=["date"], index_col="date")[CAPITALS]
-by_quarter = factors.groupby(factors.index.quarter).mean().T
+HOUSES, ATTACHED = DWELLINGS
+all_tests = pd.read_csv(TESTS_FILE).set_index(["dwelling", "city"])
+all_factors = pd.read_csv(FACTORS_FILE, parse_dates=["date"], index_col=["date", "dwelling"])
+# Per dwelling type: X-13 verdicts and tests by city, and average seasonal factor (city x quarter).
+tests_by, quarter_by = {}, {}
+for dwelling in DWELLINGS:
+    tests_by[dwelling] = all_tests.loc[dwelling].loc[CAPITALS]
+    f = all_factors.xs(dwelling, level="dwelling")[CAPITALS]
+    quarter_by[dwelling] = f.groupby(f.index.quarter).mean().T
+tests, by_quarter = tests_by[HOUSES], quarter_by[HOUSES]
 QUARTER_NAMES = {1: "March", 2: "June", 3: "September", 4: "December"}
 
 
@@ -176,9 +217,9 @@ def signed(value):
     return "0.0" if value == 0 else f"{value:+.1f}"
 
 
-def swings(cities):
+def swings(cities, dwelling=HOUSES):
     """Describe the dearest and cheapest quarters of a group of cities."""
-    group = by_quarter.loc[cities]
+    group = quarter_by[dwelling].loc[cities]
     peak, trough = group.idxmax(axis=1), group.idxmin(axis=1)
     if peak.nunique() == 1 and trough.nunique() == 1:
         return (
@@ -187,8 +228,8 @@ def swings(cities):
             f"in the {QUARTER_NAMES[trough.iloc[0]]} quarter"
         )
     return (
-        f"up to {size(group.max(axis=1))} above the seasonally adjusted price and up to "
-        f"{size(-group.min(axis=1))} below it, peaking and bottoming in different quarters"
+        f"up to {group.max(axis=1).max():.1f}% above the seasonally adjusted price and up to "
+        f"{-group.min(axis=1).min():.1f}% below it, peaking and bottoming in different quarters"
     )
 
 
@@ -197,10 +238,24 @@ spread = by_quarter.max(axis=1) - by_quarter.min(axis=1)
 largest = [c for c in CAPITALS if c in spread.nlargest(2).index]
 others = [c for c in CAPITALS if c not in largest]
 
-passing = tests.index[tests["combined_test"] == "present"]
-passes = (
-    "Every city passes" if len(passing) == len(tests)
-    else f"{len(passing)} of {len(tests)} cities pass ({join(passing)})"
+def passing(dwelling):
+    t = tests_by[dwelling]
+    return list(t.index[t["combined_test"] == "present"])
+
+
+def passes(dwelling):
+    cities = passing(dwelling)
+    if len(cities) == len(CAPITALS):
+        return "every city passes"
+    if not cities:
+        return "no city passes"
+    return f"{len(cities)} of {len(CAPITALS)} cities pass ({join(cities)})"
+
+
+attached_cities = passing(ATTACHED)
+attached_text = f"For attached dwellings, such as units, apartments and townhouses, {passes(ATTACHED)}" + (
+    f", and in {'that city' if len(attached_cities) == 1 else 'those cities'} prices are "
+    f"{swings(attached_cities, ATTACHED)}." if attached_cities else "."
 )
 dearest = by_quarter.idxmax(axis=1)
 dearest_text = (
@@ -209,12 +264,12 @@ dearest_text = (
     else "The dearest quarter varies by city."
 )
 
-# Quarters each city's X-13 run covered, quoted in appendix Step 1.
-lengths = factors.notna().sum()
+# Quarters each X-13 run covered (one per city and dwelling type), quoted in appendix Step 1.
+lengths = all_factors.groupby(level="dwelling").count().stack()
 n_quarters = span(lengths, "{:.0f}")
 series_length = (
-    f"each city's series has {n_quarters} quarters" if lengths.nunique() == 1
-    else f"the cities' series have {n_quarters} quarters"
+    f"each series has {n_quarters} quarters" if lengths.nunique() == 1
+    else f"the series have {n_quarters} quarters"
 )
 n_candidates = span(2 * lengths, "{:.0f}")
 
@@ -222,39 +277,60 @@ display(Markdown(
     "To test whether these swings are real seasonality rather than noise, I run each city's "
     "prices through X-13ARIMA-SEATS [@x13manual], the seasonal adjustment program used by "
     "the US Census Bureau and most statistical agencies, including the ABS. "
-    f"{passes} the program's combined test for identifiable seasonality. {dearest_text} "
+    f"For established houses, {passes(HOUSES)} the program's combined test for identifiable "
+    f"seasonality. {dearest_text} "
     f"{join(largest)} have the largest swings, {swings(largest)}. "
     f"In the other capitals prices are {swings(others)}. "
+    f"{attached_text} "
     "An earlier study of the eight capitals, @valadkhani2015, used monthly prices and a "
     "different method, and also found sizable seasonal effects, in the smallest capitals "
     "(Darwin and Hobart) and the largest (Melbourne and Sydney)."
 ))
 
 
-rows = [
-    "| City | Seasonality | Q1 | Q2 | Q3 | Q4 |",
-    "|:--|:--|--:|--:|--:|--:|",
+# HTML rather than a Markdown table, which can't group columns under a dwelling-type header.
+quarter_heads = "".join(f'<th style="text-align: right">Q{q}</th>' for q in range(1, 5))
+html = [
+    '<div style="overflow-x: auto"><table class="table table-sm">',
+    '<thead><tr><th rowspan="2" style="vertical-align: bottom">City</th>',
+    *(f'<th colspan="5" style="text-align: center">{d}</th>' for d in DWELLINGS),
+    "</tr><tr>",
+    f"<th>Seasonality</th>{quarter_heads}" * len(DWELLINGS),
+    "</tr></thead><tbody>",
 ]
-for city, t in tests.iterrows():
-    factor_cells = " | ".join(signed(by_quarter.loc[city, q]) for q in range(1, 5))
-    # A missing verdict (X-13 output not parsed) shows as "n/a" rather than breaking the build.
-    verdict = t["combined_test"].capitalize() if pd.notna(t["combined_test"]) else "n/a"
-    rows.append(f"| {city} | {verdict} | {factor_cells} |")
-display(Markdown("\n".join(rows)))
+for city in CAPITALS:
+    html.append(f"<tr><td>{city}</td>")
+    for dwelling in DWELLINGS:
+        verdict = tests_by[dwelling].loc[city, "combined_test"]
+        # Factors of a series without identifiable seasonality are mostly noise, so fade them.
+        fade = "" if verdict == "present" else "; opacity: 0.45"
+        # A missing verdict (X-13 output not parsed) shows as "n/a" rather than breaking the build.
+        html.append(f"<td>{verdict.capitalize() if pd.notna(verdict) else 'n/a'}</td>")
+        html.extend(
+            f'<td style="text-align: right{fade}">{signed(quarter_by[dwelling].loc[city, q])}</td>'
+            for q in range(1, 5)
+        )
+    html.append("</tr>")
+html.append("</tbody></table></div>")
+display(HTML("".join(html)))
 
+dates = all_factors.index.get_level_values("date")
 display(Markdown(
-    "*Seasonality and average seasonal factors for the median price of established houses, "
-    "by capital city. Seasonality is X-13ARIMA-SEATS's combined test for identifiable "
-    "seasonality (see the appendix). Q1 to Q4 give the average seasonal factor of each "
-    "quarter (Q1 is the March quarter, Q4 the December quarter), in per cent above or below the seasonally adjusted price, over "
-    f"{factors.index.min():%B %Y} to {factors.index.max():%B %Y}. "
-    f"Source: {SOURCE}; author's calculations.*"
+    "*Seasonality and average seasonal factors for the median price of established houses "
+    "and attached dwellings, by capital city. Seasonality is X-13ARIMA-SEATS's combined test "
+    "for identifiable seasonality (see the appendix). Q1 to Q4 give the average seasonal "
+    "factor of each quarter (Q1 is the March quarter, Q4 the December quarter), in per cent "
+    "above or below the seasonally adjusted price, over "
+    f"{dates.min():%B %Y} to {dates.max():%B %Y} for established houses and from "
+    f"{all_factors.xs(ATTACHED, level='dwelling').index.min():%B %Y} for attached dwellings. "
+    "Factors are faded where X-13 finds no identifiable seasonality, as they then mostly "
+    f"reflect noise. Source: {SOURCE}; author's calculations.*"
 ))
 ```
 
 ## Appendix: methodology {.appendix}
 
-I estimate the seasonal factors using the US Census Bureau's X-13ARIMA-SEATS procedure on the log of each city's quarterly median price.
+I estimate the seasonal factors using the US Census Bureau's X-13ARIMA-SEATS procedure on the log of each city's quarterly median price, separately for established houses and attached dwellings.
 
 ### The model
 
