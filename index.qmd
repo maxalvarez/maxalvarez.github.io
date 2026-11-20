@@ -2,5 +2,7 @@ Hello World!
 
 I'm Max, an economist, multidisciplinary researcher and data science enthusiast with extensive expertise in labour, housing and energy markets, and population and consumer behaviour. I enjoy devising innovative problem-solving approaches and leading large and complex quantitative projects to deliver actionable insights for decision-making.
 
-In the blog, I will be publishing brief economic and population analyses, research notes and more.
+I currently work as a data scientist at Informed Decisions (.id), where I drive continuous improvements to .id's population forecast models and tools.
+
+In the blog, I will be publishing brief economic and population analyses, hoping they can be useful or at least interesting to readers.
 
