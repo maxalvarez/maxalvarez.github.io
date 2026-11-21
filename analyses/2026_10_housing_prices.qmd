@@ -3,6 +3,8 @@ title: "Is there a best and worst time in the year to buy or sell a residential 
 date: 2026-10-31
 categories: [Housing Economics]
 description: "Understanding residential property price seasonality helps both buyers and sellers strategise when to make an offer or list a home to buy cheaper and sell more expensive."
+image: images/melbourne_auction_2026.jpeg
+image-alt: "Two real estate agent boards outside neighbouring townhouses in Rosanna, Melbourne."
 bibliography: references.bib
 csl: apa.csl
 ---
@@ -11,13 +13,19 @@ csl: apa.csl
 ![Real estate boards in Rosanna, Melbourne, in 2026: one townhouse sold at a winter auction, the one next door is up for auction in spring.](images/melbourne_auction_2026.jpeg){.hero-image fig-alt="Two real estate agents' boards outside neighbouring townhouses in Rosanna, Melbourne. One is marked sold after an August auction; the other is still for sale."}
 :::
 
-This year, I entered the property market for the first time. While attending inspections, auctions, and, in some cases, making offers, I wondered whether there was a more convenient season to buy. I thought of that, obviously, alongside all other factors that can determine the price of a specific dwelling and overall property market trends. To learn about housing price seasonality, I decided to analyse median prices over time of established house and attached dwellings (townhouses, apartments) sales published by the ABS. I included all capital cities despite just wanting to buy in Melbourne because I also wanted to know whether seasonality was present only in some cities and, if it was present in more than one city, whether their seasonality differed. The latter could be due to differences in cities' weather seasonality. For example, Brisbane's relatively mild and short winter compared to Melbourne's.
+This year, I entered the property market for the first time. While attending inspections, auctions, and, in some cases, making offers, I wondered whether there was a more convenient season to buy. I thought of that, obviously, alongside all other factors that can determine a specific dwelling's price and overall property market trends. To learn about housing price seasonality, I decided to analyse median prices over time of established house and attached dwellings (townhouses, apartments) sales published by the ABS. I included all capital cities despite just wanting to buy in Melbourne because I also wanted to know whether seasonality was present only in some cities and, if it was present in more than one city, whether their seasonality differed. The latter could be due to differences in cities' weather seasonality. For example, Brisbane's relatively mild and short winter compared to Melbourne's.
 
-Of course, I am not the first to examine seasonality in housing prices, not even in Australia. @valadkhani2015, for instance, analysed monthly price seasonality in the eight capital cities from 1995 to 2015, separating houses and apartments. They found noticeable seasonality in all cities, more pronounced in houses than apartments. Regarding which months were the most and least expensive, their findings are difficult to distil into a single headline; however, they tend to suggest that summers were more expensive and spring cheaper in most cities. Yet, I do think this topic deserves a revisit. Not only to capture the COVID and post-COVID period, which severely impacted the property market through border closures and accelerating remote working, but also because of the latest fall in housing prices linked to recent tax changes coupled with rising interest rates.
+Of course, I am not the first to examine seasonality in housing prices, not even in Australia. @valadkhani2015, for instance, analysed monthly price seasonality in the eight capital cities from 1995 to 2015, separating houses and apartments. They found noticeable seasonality in all cities, more pronounced in houses than apartments. Regarding which months were the most and least expensive, their findings are difficult to distil into a single headline; however, they tend to suggest that summers were more expensive and spring cheaper in most cities.
 
-The rest of the post is organised as follows. The next section presents the data and provides a visual inspection of house prices over time. Then, I present the results of the formal statistical analysis of seasonality, identifying what the most and least expensive seasons are in each city. Next, I discuss limitations and implications for prospective buyers and seller strategies. Finally, I include an appendix explaining the methodology used to identify seasonality.
+Yet, I do think property price seasonality deserves a refresh, especially to account for post-2015 episodes. That is, to include the COVID and post-COVID period, which severely impacted the property market through border closures and accelerating remote working. Also, to capture the latest fall in housing prices resulting from recent tax changes and interest rate hikes.
 
-## Visual inspection
+The rest of the post is organised as follows. The next section presents the data and provides a visual inspection of housing prices over time. Then, I present the results of the formal statistical analysis of seasonality, identifying what the most and least expensive seasons are in each city. Next, I discuss limitations and implications for prospective buyers' and sellers' strategies. Finally, I include an appendix explaining the methodology used to identify seasonality.
+
+## Data and exploratory analysis
+
+I fetched the median sale prices of established houses and attached dwellings (units, apartments and townhouses) in each of the eight capital cities, published by the ABS in its Total Value of Dwellings release (Table 2). The house series starts in the March quarter of 2002 and the attached dwelling series in the September quarter of 2003, and both run to the June quarter of 2026, giving 98 and 92 quarters respectively. The ABS publishes these series in their original form, without seasonal adjustments, so any seasonal pattern is present, which is the focus of this analysis.
+
+I applied two transformations to the price series, shown in the next figure, to visually detect when prices are higher or lower. One, represented by orange lines, is the percentage change from the previous quarter. The other, represented by the blue lines, is the difference, in per cent, between the price and its average over the surrounding four quarters. The shaded background marks the four quarters. Then, if a quarter is consistently expensive, both lines would peak in that quarter, year after year.
 
 ```{python}
 #| label: capital-prices
@@ -175,7 +183,7 @@ display(Markdown(
 ))
 ```
 
-## The formal statistical test
+## A more formal seasonality identification
 
 ```{python}
 #| label: x13-tests
@@ -328,13 +336,15 @@ display(Markdown(
 ))
 ```
 
-## Appendix: methodology {.appendix}
+## Implications for buyers and sellers
 
-I estimate the seasonal factors using the US Census Bureau's X-13ARIMA-SEATS procedure on the log of each city's quarterly median price, separately for established houses and attached dwellings.
+## Appendix: The X-13ARIMA-SEATS methodology {.appendix}
 
-### The model
+This apprendix explains the @x13manual's X-13ARIMA-SEATS procedure to estimate the seasonal factors of the log of each city's quarterly median price, for established houses and attached dwellings separately.
 
-X-13 first describes the log price, $y_t$, with a model called regARIMA, which has two layers. The first captures one-off events, and the second models the rest of the series:
+### Specification
+
+The log price, $y_t$, is modeled  with a regARIMA specification, which has two layers. The first layer captures one-off events, and the second models the rest of the series:
 
 $$
 y_t = \underbrace{\sum_k \beta_k x_{k,t}}_{\text{one-off events}} + \underbrace{z_t}_{\text{everything else}}.
@@ -376,7 +386,9 @@ $\varepsilon_t$ is the genuine surprise in each quarter, the part nothing in the
 
 So, X-13 has four things to find: the outliers and their sizes $\beta_k$, the differencing orders $d$ and $D$, the numbers of AR and MA terms $p$, $q$, $P$ and $Q$, and the coefficients themselves ($\phi_1$, $\Theta_1$ and so on). Steps 1 to 4 below describe how X-13 finds them, in the sequence it follows.
 
-### Step 1: Search for outliers
+### The estimation
+
+#### Step 1: Search for outliers
 
 X-13 starts by fitting a simple default model to the log price $y_t$, with no outliers yet. The default model is $(0\ 1\ 1)(0\ 1\ 1)$, known as the *airline model*:
 
@@ -394,7 +406,7 @@ The two coefficients, $\theta_1$ and $\Theta_1$, are estimated by maximum likeli
 
 Finally, the outliers found are subtracted from the log price, which gives $y_t - \sum_k \beta_k x_{k,t}$, so the following steps work on this outlier-free log price series.
 
-### Step 2: The differencing orders $d$ and $D$
+#### Step 2: The differencing orders $d$ and $D$
 
 Then, the X-13 program tests whether the outlier-free log price from Step 1 needs differencing to become stationary:
 
@@ -405,11 +417,11 @@ Then, the X-13 program tests whether the outlier-free log price from Step 1 need
 5. Differences the outlier-free log price accordingly and fits a model with one AR term and one MA term of each kind, quarterly and yearly, $(1\ d\ 1)(1\ D\ 1)$.
 6. Checks whether the estimated quarterly AR coefficient $\phi_1$ or yearly AR coefficient $\Phi_1$ is close to one. If so, adds another difference of the matching kind and repeats point 5. This continues until neither AR coefficient is close to one, up to a maximum of $d = 2$ and $D = 1$.
 
-### Step 3: The numbers of AR and MA terms $p$, $q$, $P$ and $Q$
+#### Step 3: The numbers of AR and MA terms $p$, $q$, $P$ and $Q$
 
 With $d$ and $D$ fixed, X-13 chooses how far back the model looks: the number of quarterly and yearly AR terms ($p$ and $P$) and of quarterly and yearly MA terms ($q$ and $Q$). It compares candidate seasonal ARIMA models fitted to the outlier-free log price, with up to two quarterly AR terms and two quarterly MA terms ($p \le 2$, $q \le 2$), and up to one yearly AR term and one yearly MA term ($P \le 1$, $Q \le 1$). Each candidate model gets a BIC (Bayesian Information Criterion), the one with the lowest BIC is chosen.
 
-### Step 4: Search for outliers again and settle the model
+#### Step 4: Search for outliers again and settle the model
 
 With the numbers of AR and MA terms chosen, X-13 settles the model:
 
@@ -420,7 +432,7 @@ With the numbers of AR and MA terms chosen, X-13 settles the model:
 
 The final regARIMA model does two jobs for Step 5. First, it removes the outliers from the price series, so a one-off spike is not mistaken for seasonality. Second, it forecasts the price series one year ahead, so the moving averages in Step 5 have data to work with at the end of the sample.
 
-### Step 5: Separate the seasonal factors with the X-11 filter
+#### Step 5: Separate the seasonal factors with the X-11 filter
 
 Within the X-13 procedure, X-11, a seasonal adjustment method developed by the US Census Bureau in the 1960s [@shiskin1967], is applied to separate the seasonal pattern from the trend and the noise.
 
@@ -448,7 +460,7 @@ At each round, X-11 also detects extreme values of the irregular part and gives 
 
 The result is a final seasonal factor $S_t$ for every quarter and the seasonally adjusted price $A_t = P_t / S_t$.
 
-### Step 6: Express the seasonal factors in per cent
+#### Step 6: Express the seasonal factors in per cent
 
 Next, I express each seasonal factor as a percentage above or below the seasonally adjusted price:
 
@@ -458,7 +470,7 @@ $$
 
 and I report the average of $s_t$ over every year of the sample, for each quarter of the year. @hu2026 use a similar approach for US house prices: they express the seasonal component in per cent and average it for each month of the year.
 
-### Step 7: Test for statistically significant and stable seasonality
+#### Step 7: Test for statistically significant and stable seasonality
 
 X-13 tests the seasonal-irregular ratios $SI_t$ from the final round of X-11:
 

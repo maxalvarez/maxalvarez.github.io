@@ -4,5 +4,5 @@ listing:
     - analyses
   sort: "date desc"
   categories: true
-  fields: [title, date, categories, description]
+  fields: [image, title, date, categories, description]
 ---
