@@ -1,5 +1,5 @@
 ---
-title: "Is there a best and worst time in the year to buy or sell a residential property in Australia?"
+title: "Are there more and less convenient times of the year to buy and sell a residential property in Australia?"
 date: 2026-10-31
 categories: [Housing Economics]
 description: "Understanding residential property price seasonality helps both buyers and sellers strategise when to make an offer or list a home to buy cheaper and sell more expensive."
@@ -17,15 +17,15 @@ This year, I entered the property market for the first time. While attending ins
 
 Of course, I am not the first to examine seasonality in housing prices, not even in Australia. @valadkhani2015, for instance, analysed monthly price seasonality in the eight capital cities from 1995 to 2015, separating houses and apartments. They found noticeable seasonality in all cities, more pronounced in houses than apartments. Regarding which months were the most and least expensive, their findings are difficult to distil into a single headline; however, they tend to suggest that summers were more expensive and spring cheaper in most cities.
 
-Yet, I do think property price seasonality deserves a refresh, especially to account for post-2015 episodes. That is, to include the COVID and post-COVID period, which severely impacted the property market through border closures and accelerating remote working. Also, to capture the latest fall in housing prices resulting from recent tax changes and interest rate hikes.
+Nonetheless, I think property price seasonality deserves a refreshed examination to account for post-2015 episodes. Of course, the most prominent has been COVID, which severely impacted the property market through border closures and accelerated remote working. Also, the recent drop in housing prices, driven by tax changes and interest rate hikes.
 
 The rest of the post is organised as follows. The next section presents the data and provides a visual inspection of housing prices over time. Then, I present the results of the formal statistical analysis of seasonality, identifying what the most and least expensive seasons are in each city. Next, I discuss limitations and implications for prospective buyers' and sellers' strategies. Finally, I include an appendix explaining the methodology used to identify seasonality.
 
 ## Data and exploratory analysis
 
-I fetched the median sale prices of established houses and attached dwellings (units, apartments and townhouses) in each of the eight capital cities, published by the ABS in its Total Value of Dwellings release (Table 2). The house series starts in the March quarter of 2002 and the attached dwelling series in the September quarter of 2003, and both run to the June quarter of 2026, giving 98 and 92 quarters respectively. The ABS publishes these series in their original form, without seasonal adjustments, so any seasonal pattern is present, which is the focus of this analysis.
+I fetched the median sale prices of established houses and attached dwellings (units, apartments and townhouses) in each of the eight capital cities, published by the ABS in its Total Value of Dwellings release (Table 2). The house series starts in the March quarter of 2002 and the attached dwelling series in the September quarter of 2003, and both run to the June quarter of 2026, giving 98 and 92 quarters, respectively.
 
-I applied two transformations to the price series, shown in the next figure, to visually detect when prices are higher or lower. One, represented by orange lines, is the percentage change from the previous quarter. The other, represented by the blue lines, is the difference, in per cent, between the price and its average over the surrounding four quarters. The shaded background marks the four quarters. Then, if a quarter is consistently expensive, both lines would peak in that quarter, year after year.
+To visually inspect property price seasonality, I applied two transformations to the price series, shown in the next figure. One, represented by orange lines, is simply the percentage change from the previous quarter. The other, represented by the blue lines, is the percentage difference between the price and its average over the surrounding four quarters. Focusing on percentage differences rather than prices themselves helps set aside the increasing long-term trend that characterises housing prices, making it easier to identify seasonal swings. In the figure, I have also shaded the background to more easily distinguish the quarters.
 
 ```{python}
 #| label: capital-prices
@@ -340,11 +340,11 @@ display(Markdown(
 
 ## Appendix: The X-13ARIMA-SEATS methodology {.appendix}
 
-This apprendix explains the @x13manual's X-13ARIMA-SEATS procedure to estimate the seasonal factors of the log of each city's quarterly median price, for established houses and attached dwellings separately.
+This appendix explains the @x13manual's X-13ARIMA-SEATS procedure to estimate the seasonal factors of the log of each city's quarterly median price, for established houses and attached dwellings separately.
 
 ### Specification
 
-The log price, $y_t$, is modeled  with a regARIMA specification, which has two layers. The first layer captures one-off events, and the second models the rest of the series:
+The log price, $y_t$, is modeled with regARIMA, which has two layers. The first layer captures one-off events, and the second models the rest of the series:
 
 $$
 y_t = \underbrace{\sum_k \beta_k x_{k,t}}_{\text{one-off events}} + \underbrace{z_t}_{\text{everything else}}.
@@ -474,7 +474,7 @@ and I report the average of $s_t$ over every year of the sample, for each quarte
 
 X-13 tests the seasonal-irregular ratios $SI_t$ from the final round of X-11:
 
-**Stable F** tests whether the differences between the four quarter means are statistically significant.
+**Stable F** groups the $SI_t$ ratios by quarter of the year and tests whether the differences between the group means are statistically significant.
 
 **Kruskal–Wallis** tests for statistically significant differences between the quarters, like the stable F test, but without assuming normally distributed residuals.
 
