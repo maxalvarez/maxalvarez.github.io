@@ -1,5 +1,5 @@
 ---
-title: "Are there more and less convenient times of the year to buy and sell a residential property in Australia?"
+title: "Is there a best time of year to buy or sell a home in Australia?"
 date: 2026-10-31
 categories: [Housing Economics]
 description: "Understanding residential property price seasonality helps both buyers and sellers strategise when to make an offer or list a home to buy cheaper and sell more expensive."
@@ -13,7 +13,7 @@ csl: apa.csl
 ![Real estate boards in Rosanna, Melbourne, in 2026: one townhouse sold at a winter auction, the one next door is up for auction in spring.](images/melbourne_auction_2026.jpeg){.hero-image fig-alt="Two real estate agents' boards outside neighbouring townhouses in Rosanna, Melbourne. One is marked sold after an August auction; the other is still for sale."}
 :::
 
-This year, I entered the property market for the first time. While attending inspections, auctions, and, in some cases, making offers, I wondered whether there was a more convenient season to buy. I thought of that, obviously, alongside all other factors that can determine a specific dwelling's price and overall property market trends. To learn about housing price seasonality, I decided to analyse median prices over time of established house and attached dwellings (townhouses, apartments) sales published by the ABS. I included all capital cities despite just wanting to buy in Melbourne because I also wanted to know whether seasonality was present only in some cities and, if it was present in more than one city, whether their seasonality differed. The latter could be due to differences in cities' weather seasonality. For example, Brisbane's relatively mild and short winter compared to Melbourne's.
+This year, I entered the property market for the first time. While attending inspections, auctions, and making offers, I wondered whether there was a more convenient season to buy. I thought of that, obviously, alongside all other factors that can determine a specific dwelling's price and overall property market trends. To answer that question, I decided to analyse median prices of established houses and attached dwellings (townhouses, apartments) over time published by the ABS. I included all capital cities, even though I was searching for a home just in Melbourne, also to see whether seasonality was present only in some cities and, if it was present in more than one city, whether their seasonality differed. The latter could be due to differences in cities' weather seasonality. For example, Brisbane's relatively mild and short winter compared to Melbourne's.
 
 Of course, I am not the first to examine seasonality in housing prices, not even in Australia. @valadkhani2015, for instance, analysed monthly price seasonality in the eight capital cities from 1995 to 2015, separating houses and apartments. They found noticeable seasonality in all cities, more pronounced in houses than apartments. Regarding which months were the most and least expensive, their findings are difficult to distil into a single headline; however, they tend to suggest that summers were more expensive and spring cheaper in most cities.
 
@@ -171,17 +171,13 @@ display(HTML(fig.to_html(
 )))
 
 display(Markdown(
-    "*Median price of established houses (left) and attached dwellings, such as units, "
-    "apartments and townhouses (right), sold in each capital city: as a percentage above "
-    "or below its trend (blue), and as a percentage change from the previous quarter "
-    "(orange). The trend is a centred 4-quarter moving average, which smooths out "
-    "seasonal swings and long-run price growth, so the first and last two quarters of the "
-    "data have no trend (the blue line ends in the "
-    f"{deviation['Established houses'].index.max():%B %Y} quarter). "
-    "Vertical scales differ by city but are the same for both dwelling types in a city. "
-    f"Source: {SOURCE}.*"
+    "Median price of established houses (left) and attached dwellings (right), sold in "
+    "each capital city, as a percentage from its trend (blue), and as a "
+    "percentage change from the previous quarter (orange). "
 ))
 ```
+
+The figure shows a clear pattern for houses. In every city, prices have been above their trend in the fourth quarter (October to December) in most years, and on average that is also when they have grown fastest. The low point comes in the third quarter (July to September) in most cities, but in the first quarter (January to March) in Sydney and Melbourne. Attached dwellings show a less pronounced pattern. Sydney and Melbourne follow a milder version of their houses' cycle, with the second quarter about as expensive as the fourth. Elsewhere, the clearest feature is a third-quarter dip, most visible in Hobart and Darwin.
 
 ## A more formal seasonality identification
 
