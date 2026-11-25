@@ -5,6 +5,7 @@ listing:
   contents:
     - analyses
   sort: "date desc"
+  date-format: "MMMM YYYY"
   categories: true
   fields: [image, title, date, categories]
 ---

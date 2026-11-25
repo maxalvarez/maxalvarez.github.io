@@ -1,8 +1,9 @@
 ---
 title: "Is there a best time of year to buy or sell a home in Australia?"
-date: 2026-10-31
+date: 2026-12-01
+date-format: "MMMM YYYY"
 categories: [Housing Economics]
-description: "Understanding residential property price seasonality helps both buyers and sellers strategise when to make an offer or list a home to buy cheaper and sell more expensive."
+description: "Understanding residential property price seasonality helps buyers and sellers strategise when to make an offer or list a home to buy cheaper and sell for more."
 image: images/melbourne_auction_2026.jpeg
 image-alt: "Two real estate agent boards outside neighbouring townhouses in Rosanna, Melbourne."
 bibliography: references.bib
@@ -13,19 +14,19 @@ csl: apa.csl
 ![Real estate boards in Rosanna, Melbourne, in 2026: one townhouse sold at a winter auction, the one next door is up for auction in spring.](images/melbourne_auction_2026.jpeg){.hero-image fig-alt="Two real estate agents' boards outside neighbouring townhouses in Rosanna, Melbourne. One is marked sold after an August auction; the other is still for sale."}
 :::
 
-This year, I entered the property market for the first time. While attending inspections, auctions, and making offers, I wondered whether there was a more convenient season to buy. I thought of that, obviously, alongside all other factors that can determine a specific dwelling's price and overall property market trends. To answer that question, I decided to analyse median prices of established houses and attached dwellings (townhouses, apartments) over time published by the ABS. I included all capital cities, even though I was searching for a home just in Melbourne, also to see whether seasonality was present only in some cities and, if it was present in more than one city, whether their seasonality differed. The latter could be due to differences in cities' weather seasonality. For example, Brisbane's relatively mild and short winter compared to Melbourne's.
+This year, I entered the property market for the first time. While attending inspections, auctions, and making offers, I wondered whether there was a more convenient season to buy. I thought of that, obviously, alongside all other factors that can determine a specific dwelling's price and overall property market trends. To answer that question, I analysed median prices of established houses and attached dwellings (townhouses, apartments) over time. Although I was searching for a home only in Melbourne, I included all capital cities to see whether seasonality was present only in some cities and, if it was present in more than one city, whether their seasonality differed. The latter could be due to differences in cities' weather seasonality. For example, Brisbane's relatively mild and short winter compared to Melbourne's.
 
-Of course, I am not the first to examine seasonality in housing prices, not even in Australia. @valadkhani2015, for instance, analysed monthly price seasonality in the eight capital cities from 1995 to 2015, separating houses and apartments. They found noticeable seasonality in all cities, more pronounced in houses than apartments. Regarding which months were the most and least expensive, their findings are difficult to distil into a single headline; however, they tend to suggest that summers were more expensive and spring cheaper in most cities.
+I am not the first to examine seasonality in housing prices, not even in Australia. @valadkhani2015, for instance, analysed monthly price seasonality in the eight capital cities from 1995 to 2015, separating houses and apartments. They found noticeable seasonality in all cities, more pronounced in houses than apartments. Regarding which months were the most and least expensive, their findings are difficult to distil into a single headline; however, they tend to suggest that summers were more expensive and spring cheaper in most cities.
 
-Nonetheless, I think property price seasonality deserves a refreshed examination to account for post-2015 episodes. Of course, the most prominent has been COVID, which severely impacted the property market through border closures and accelerated remote working. Also, the recent drop in housing prices, driven by tax changes and interest rate hikes.
+Although there is already a study covering housing price seasonality in Australia, I still wanted to go ahead with my own to account for post-2015 episodes. The most prominent shock has been COVID, which severely impacted the property market through border closures and by accelerating the adoption of remote working. Another noteworthy development is last year's drop in housing prices, driven by tax changes and interest rate hikes.
 
-The rest of the post is organised as follows. The next section presents the data and provides a visual inspection of housing prices over time. Then, I present the results of the formal statistical analysis of seasonality, identifying what the most and least expensive seasons are in each city. Next, I discuss limitations and implications for prospective buyers' and sellers' strategies. Finally, I include an appendix explaining the methodology used to identify seasonality.
+This post presents the study, which is organised as follows. I start by illustrating the housing prices data and its potential seasonality. Then, I present the results of the formal seasonality statistical analysis, which identifies the most and least expensive seasons in each city. Next, I discuss limitations and implications for prospective buyers' and sellers' strategies. Finally, I include an appendix explaining the methodology used to identify seasonality.
 
 ## Data and exploratory analysis
 
-I fetched the median sale prices of established houses and attached dwellings (units, apartments and townhouses) in each of the eight capital cities, published by the ABS in its Total Value of Dwellings release (Table 2). The house series starts in the March quarter of 2002 and the attached dwelling series in the September quarter of 2003, and both run to the June quarter of 2026, giving 98 and 92 quarters, respectively.
+I fetched the median sale prices of established houses and attached dwellings (units, apartments and townhouses) in each of the eight capital cities, published by the ABS in its [Total Value of Dwellings release](https://www.abs.gov.au/statistics/economy/price-indexes-and-inflation/total-value-dwellings/jun-quarter-2026) (Table 2). The house series starts in the March quarter of 2002 and the attached dwelling series in the September quarter of 2003, and both run to the June quarter of 2026, giving 98 and 92 quarters, respectively.
 
-To visually inspect property price seasonality, I applied two transformations to the price series, shown in the next figure. One, represented by orange lines, is simply the percentage change from the previous quarter. The other, represented by the blue lines, is the percentage difference between the price and its average over the surrounding four quarters. Focusing on percentage differences rather than prices themselves helps set aside the increasing long-term trend that characterises housing prices, making it easier to identify seasonal swings. In the figure, I have also shaded the background to more easily distinguish the quarters.
+To visually inspect property price seasonality, I applied two transformations to the price series, shown in the next figure. The orange lines are the percentage change from the previous quarter. The blue lines are the percentage difference between the price and its average over the surrounding four quarters. I chose to illustrate these two measures over depicting prices themselves because they help set aside the increasing long-term trend that characterises housing prices, making it easier to identify seasonal swings. In the figure, I have also shaded the background to more easily distinguish the quarters.
 
 ```{python}
 #| label: capital-prices
@@ -181,6 +182,8 @@ The figure shows a clear pattern for houses. In every city, prices have been abo
 
 ## A more formal seasonality identification
 
+The figure above suggests the presence of seasonality, especially for houses. However, a formal statistical procedure is needed not only to be more certain that it is there but also to identify the quarters that are better for buying and selling in each city. This is because a quarter can look more expensive in most years partly by chance, or because of specific one-off events. Moreover, the figure alone does not estimate the size of these regular within-year price variations, making it challenging to tell which quarter is the most or least expensive when two look similar, as with Sydney and Melbourne's attached dwellings.
+
 ```{python}
 #| label: x13-tests
 #| echo: false
@@ -276,22 +279,15 @@ series_length = (
     else f"the series have {n_quarters} quarters"
 )
 n_candidates = span(2 * lengths, "{:.0f}")
+```
 
-display(Markdown(
-    "To test whether these swings are real seasonality rather than noise, I run each city's "
-    "prices through X-13ARIMA-SEATS [@x13manual], the seasonal adjustment program used by "
-    "the US Census Bureau and most statistical agencies, including the ABS. "
-    f"For established houses, {passes(HOUSES)} the program's combined test for identifiable "
-    f"seasonality. {dearest_text} "
-    f"{join(largest)} have the largest swings, {swings(largest)}. "
-    f"In the other capitals prices are {swings(others)}. "
-    f"{attached_text} "
-    "An earlier study of the eight capitals, @valadkhani2015, used monthly prices and a "
-    "different method, and also found sizable seasonal effects, in the smallest capitals "
-    "(Darwin and Hobart) and the largest (Melbourne and Sydney)."
-))
+To determine whether housing price seasonality is statistically significant and measure each quarter's effect in each city, I use X-13ARIMA-SEATS [@x13manual]. X-13 is the US Census Bureau's seasonal adjustment program and is built upon the X-11 method [@shiskin1967]. X-11 also underpins the ABS's own seasonal adjustment. X-13 is used in several recent studies on housing price seasonality. For example, researchers at the US Federal Housing Finance Agency used it to seasonally adjust the agency's house price indexes for more than 400 metropolitan areas, finding that seasonality differs between areas [@doerner2022]. @hu2025 also used it and found that prices and sales in the US rise in spring and summer and fall in winter, that this is more pronounced in colder regions, and that since COVID it has also shifted earlier in the year.
 
+The table below shows the results for each dwelling type. The Seasonality column gives X-13's verdict on whether seasonality is present, and columns Q1 to Q4 show how far prices are, on average, above or below their seasonally adjusted level in each quarter.
 
+```{python}
+#| label: x13-table
+#| echo: false
 # HTML rather than a Markdown table, which can't group columns under a dwelling-type header.
 quarter_heads = "".join(f'<th style="text-align: right">Q{q}</th>' for q in range(1, 5))
 html = [
@@ -331,6 +327,8 @@ display(Markdown(
     f"reflect noise. Source: {SOURCE}; author's calculations.*"
 ))
 ```
+
+For established houses, `{python} passes(HOUSES)` the program's combined test for identifiable seasonality. `{python} dearest_text` `{python} join(largest)` have the largest swings, `{python} swings(largest)`. In the other capitals prices are `{python} swings(others)`. `{python} attached_text` An earlier study of the eight capitals, @valadkhani2015, used monthly prices and a different method, and also found sizable seasonal effects, in the smallest capitals (Darwin and Hobart) and the largest (Melbourne and Sydney).
 
 ## Implications for buyers and sellers
 
