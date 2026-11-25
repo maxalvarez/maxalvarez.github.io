@@ -24,27 +24,59 @@ This post presents the study, which is organised as follows. I start by illustra
 
 ## Data and exploratory analysis
 
-I fetched the median sale prices of established houses and attached dwellings (units, apartments and townhouses) in each of the eight capital cities, published by the ABS in its [Total Value of Dwellings release](https://www.abs.gov.au/statistics/economy/price-indexes-and-inflation/total-value-dwellings/jun-quarter-2026) (Table 2). The house series starts in the March quarter of 2002 and the attached dwelling series in the September quarter of 2003, and both run to the June quarter of 2026, giving 98 and 92 quarters, respectively.
-
-To visually inspect property price seasonality, I applied two transformations to the price series, shown in the next figure. The orange lines are the percentage change from the previous quarter. The blue lines are the percentage difference between the price and its average over the surrounding four quarters. I chose to illustrate these two measures over depicting prices themselves because they help set aside the increasing long-term trend that characterises housing prices, making it easier to identify seasonal swings. In the figure, I have also shaded the background to more easily distinguish the quarters.
-
 ```{python}
-#| label: capital-prices
+#| label: setup
 #| echo: false
-
 import sys
 
 import pandas as pd
 import plotly.graph_objects as go
-from IPython.display import HTML, Markdown, display
+from plotly.offline import get_plotlyjs_version
 from plotly.subplots import make_subplots
 
 sys.path.insert(0, "../etl")
-from housing_prices import SOURCE, CAPITALS, DWELLINGS, load_capitals
+from housing_prices import CAPITALS, DWELLINGS, RELEASE_PAGE, load_capitals
 
+HOUSES, ATTACHED = DWELLINGS
+prices = {dwelling: load_capitals(dwelling).dropna(how="all") for dwelling in DWELLINGS}
+
+
+def quarter_name(date):
+    return f"{date:%B} quarter of {date:%Y}"
+
+
+def print_float(label, html, caption):
+    """Print raw HTML as a numbered Quarto figure or table (label "fig-..." or "tbl-...").
+
+    Used with `output: asis` instead of display(HTML(...)): notebook HTML output makes Quarto
+    load require.js and jQuery, which nothing on the page uses.
+    """
+    print(f"::: {{#{label}}}")
+    print("```{=html}")
+    print(html)
+    print("```\n")
+    print(caption)
+    print(":::")
+
+
+start = {dwelling: quarter_name(p.index.min()) for dwelling, p in prices.items()}
+n_obs = {dwelling: len(p) for dwelling, p in prices.items()}
+end = {quarter_name(p.index.max()) for p in prices.values()}
+# Both series end in the release quarter; this stops the build if that ever changes.
+assert len(end) == 1, "the two series end in different quarters"
+(end,) = end
+```
+
+I fetched the median sale prices of established houses and attached dwellings (units, apartments and townhouses) in each of the eight capital cities, published by the ABS in its [Total Value of Dwellings release](`{python} RELEASE_PAGE`) (Table 2). The house series starts in the `{python} start[HOUSES]` and the attached dwelling series in the `{python} start[ATTACHED]`, and both run to the `{python} end`, giving `{python} n_obs[HOUSES]` and `{python} n_obs[ATTACHED]` quarters, respectively.
+
+To visually inspect property price seasonality, I applied two transformations to the price series, shown in @fig-capital-prices. The orange lines are the percentage change from the previous quarter. The blue lines are the percentage difference between the price and its average over the surrounding four quarters. I chose to illustrate these two measures over depicting prices themselves because they help set aside the increasing long-term trend that characterises housing prices, making it easier to identify seasonal swings. In the figure, I have also shaded the background to more easily distinguish the quarters.
+
+```{python}
+#| label: capital-prices
+#| output: asis
+#| echo: false
 deviation, growth = {}, {}
-for dwelling in DWELLINGS:
-    series = load_capitals(dwelling)
+for dwelling, series in prices.items():
     # Percentage deviation from a centred 4-quarter moving average (2x4 MA). Unlike an annual
     # mean, this also removes the within-year drift, which would otherwise read as seasonality.
     # It needs two quarters either side, so each end of the sample loses two.
@@ -53,7 +85,7 @@ for dwelling in DWELLINGS:
     # Quarter-on-quarter growth needs only the previous quarter, so it runs further at both ends.
     growth[dwelling] = (series.pct_change(fill_method=None) * 100).dropna(how="all")
 # The quarter bands span every quarter that has any line.
-quarters = growth["Established houses"].index
+quarters = pd.Index([])
 for frame in [*growth.values(), *deviation.values()]:
     quarters = quarters.union(frame.index)
 
@@ -61,6 +93,13 @@ LINES = {
     "Deviation from trend": (deviation, "#08306b"),
     "Quarter-on-quarter growth": (growth, "#e66101"),
 }
+
+
+
+def day(index):
+    """Dates as plain "YYYY-MM-DD" text, which keeps the figure's data small."""
+    return index.strftime("%Y-%m-%d")
+
 
 QUARTER_BANDS = {
     "Q1 (Mar)": "#ffffff", "Q2 (Jun)": "#eeeeee", "Q3 (Sep)": "#d9d9d9", "Q4 (Dec)": "#bdbdbd",
@@ -101,7 +140,7 @@ for row, city in enumerate(CAPITALS, start=1):
     for col, dwelling in enumerate(DWELLINGS, start=1):
         fig.add_trace(
             go.Heatmap(
-                x=quarters, y=y_range, z=[quarters.quarter] * 2,
+                x=day(quarters), y=y_range, z=[quarters.quarter] * 2,
                 zmin=0.5, zmax=4.5, colorscale=band_colours,
                 showscale=False, hoverinfo="skip",
             ),
@@ -110,7 +149,7 @@ for row, city in enumerate(CAPITALS, start=1):
         for name, (data, colour) in LINES.items():
             fig.add_trace(
                 go.Scatter(
-                    x=data[dwelling].index, y=data[dwelling][city], mode="lines", name=name,
+                    x=day(data[dwelling].index), y=data[dwelling][city], mode="lines", name=name,
                     line={"color": colour, "width": 1.5},
                     legendgroup=name, legendrank=1, showlegend=row == 1 and col == 1,
                     hovertemplate="Q%{x|%q %Y}<br>%{y:.1f}%",
@@ -159,30 +198,37 @@ fig.update_layout(
         "yanchor": "top", "yref": "container", "itemclick": False, "itemdoubleclick": False,
     },
 )
-# Written out as HTML rather than with fig.show(): Plotly's notebook renderer always loads its
-# own copy of MathJax, which clashes with the one Quarto loads and leaves the equations in the
-# appendix unrendered.
-display(HTML(fig.to_html(
-    full_html=False, include_plotlyjs="cdn", include_mathjax=False,
+# Written out as raw HTML rather than with fig.show() or display(): Plotly's notebook renderer
+# loads its own copy of MathJax, which clashes with Quarto's and leaves the appendix equations
+# unrendered, and notebook HTML output makes Quarto add require.js and jQuery, which nothing uses.
+# Plotly's "cartesian" bundle has every trace type used here (scatter, heatmap) at about a
+# third of the full library's size; its version matches the installed plotly.py.
+PLOTLY_JS = (
+    "https://cdn.jsdelivr.net/npm/plotly.js-cartesian-dist-min@"
+    f"{get_plotlyjs_version()}/plotly-cartesian.min.js"
+)
+figure_html = fig.to_html(
+    full_html=False, include_plotlyjs=False, include_mathjax=False,
     config={
         "displayModeBar": True,
         "displaylogo": False,
         "modeBarButtons": [["zoomIn2d", "zoomOut2d", "autoScale2d"]],
     },
-)))
-
-display(Markdown(
-    "Median price of established houses (left) and attached dwellings (right), sold in "
-    "each capital city, as a percentage from its trend (blue), and as a "
-    "percentage change from the previous quarter (orange). "
-))
+)
+print_float(
+    "fig-capital-prices",
+    f'<script src="{PLOTLY_JS}" charset="utf-8"></script>{figure_html}',
+    "Median price of established houses (left) and attached dwellings (right), sold in each "
+    "capital city, as a percentage from its trend (blue), and as a percentage change from the "
+    "previous quarter (orange).",
+)
 ```
 
-The figure shows a clear pattern for houses. In every city, prices have been above their trend in the fourth quarter (October to December) in most years, and on average that is also when they have grown fastest. The low point comes in the third quarter (July to September) in most cities, but in the first quarter (January to March) in Sydney and Melbourne. Attached dwellings show a less pronounced pattern. Sydney and Melbourne follow a milder version of their houses' cycle, with the second quarter about as expensive as the fourth. Elsewhere, the clearest feature is a third-quarter dip, most visible in Hobart and Darwin.
+@fig-capital-prices shows a clear pattern for houses. In every city, prices have been above their trend in the fourth quarter (October to December) in most years, and on average that is also when they have grown fastest. The low point comes in the third quarter (July to September) in most cities, but in the first quarter (January to March) in Sydney and Melbourne. Attached dwellings show a less pronounced pattern. Sydney and Melbourne follow a milder version of their houses' cycle, with the second quarter about as expensive as the fourth. Elsewhere, the clearest feature is a third-quarter dip, most visible in Hobart and Darwin.
 
-## A more formal seasonality identification
+## A formal identification of seasonality
 
-The figure above suggests the presence of seasonality, especially for houses. However, a formal statistical procedure is needed not only to be more certain that it is there but also to identify the quarters that are better for buying and selling in each city. This is because a quarter can look more expensive in most years partly by chance, or because of specific one-off events. Moreover, the figure alone does not estimate the size of these regular within-year price variations, making it challenging to tell which quarter is the most or least expensive when two look similar, as with Sydney and Melbourne's attached dwellings.
+@fig-capital-prices suggests the presence of seasonality, especially for houses. However, a formal statistical procedure is needed not only to be more certain that it is there but also to identify the quarters that are better for buying and selling in each city. This is because a quarter can look more expensive in most years partly by chance, or because of specific one-off events. Moreover, the figure alone does not estimate the size of these regular within-year price variations, making it challenging to tell which quarter is the most or least expensive when two look similar, as with Sydney and Melbourne's attached dwellings.
 
 ```{python}
 #| label: x13-tests
@@ -190,7 +236,6 @@ The figure above suggests the presence of seasonality, especially for houses. Ho
 
 from housing_seasonality import FACTORS_FILE, TESTS_FILE
 
-HOUSES, ATTACHED = DWELLINGS
 all_tests = pd.read_csv(TESTS_FILE).set_index(["dwelling", "city"])
 all_factors = pd.read_csv(FACTORS_FILE, parse_dates=["date"], index_col=["date", "dwelling"])
 # Per dwelling type: X-13 verdicts and tests by city, and average seasonal factor (city x quarter).
@@ -199,7 +244,7 @@ for dwelling in DWELLINGS:
     tests_by[dwelling] = all_tests.loc[dwelling].loc[CAPITALS]
     f = all_factors.xs(dwelling, level="dwelling")[CAPITALS]
     quarter_by[dwelling] = f.groupby(f.index.quarter).mean().T
-tests, by_quarter = tests_by[HOUSES], quarter_by[HOUSES]
+by_quarter = quarter_by[HOUSES]
 QUARTER_NAMES = {1: "March", 2: "June", 3: "September", 4: "December"}
 
 
@@ -228,16 +273,23 @@ def swings(cities, dwelling=HOUSES):
     """Describe the dearest and cheapest quarters of a group of cities."""
     group = quarter_by[dwelling].loc[cities]
     peak, trough = group.idxmax(axis=1), group.idxmin(axis=1)
-    if peak.nunique() == 1 and trough.nunique() == 1:
-        return (
-            f"{size(group.max(axis=1))} above the seasonally adjusted price in the "
-            f"{QUARTER_NAMES[peak.iloc[0]]} quarter and {size(-group.min(axis=1))} below it "
-            f"in the {QUARTER_NAMES[trough.iloc[0]]} quarter"
-        )
-    return (
-        f"up to {group.max(axis=1).max():.1f}% above the seasonally adjusted price and up to "
-        f"{-group.min(axis=1).min():.1f}% below it, peaking and bottoming in different quarters"
+
+    def when(quarters, fallback):
+        """ "in the June quarter" if every city agrees, else the fallback."""
+        if quarters.nunique() == 1:
+            return f"in the {QUARTER_NAMES[quarters.iloc[0]]} quarter"
+        return fallback
+
+    text = (
+        f"{size(group.max(axis=1))} above the seasonally adjusted price "
+        f"{when(peak, 'in their dearest quarter')} and {size(-group.min(axis=1))} below it "
+        f"{when(trough, 'in their cheapest quarter')}"
     )
+    differ = [name for name, q in (("dearest", peak), ("cheapest", trough)) if q.nunique() > 1]
+    if differ:
+        plural = "s" if len(differ) > 1 else ""
+        text += f", with the {join(differ)} quarter{plural} differing between cities"
+    return text
 
 
 # The two cities with the widest gap between their dearest and cheapest quarter.
@@ -250,17 +302,18 @@ def passing(dwelling):
     return list(t.index[t["combined_test"] == "present"])
 
 
-def passes(dwelling):
-    cities = passing(dwelling)
+def passes(cities):
     if len(cities) == len(CAPITALS):
         return "every city passes"
     if not cities:
         return "no city passes"
+    if len(cities) == 1:
+        return f"only {cities[0]} passes"
     return f"{len(cities)} of {len(CAPITALS)} cities pass ({join(cities)})"
 
 
-attached_cities = passing(ATTACHED)
-attached_text = f"For attached dwellings, such as units, apartments and townhouses, {passes(ATTACHED)}" + (
+house_cities, attached_cities = passing(HOUSES), passing(ATTACHED)
+attached_text = f"For attached dwellings, such as units, apartments and townhouses, {passes(attached_cities)}" + (
     f", and in {'that city' if len(attached_cities) == 1 else 'those cities'} prices are "
     f"{swings(attached_cities, ATTACHED)}." if attached_cities else "."
 )
@@ -271,7 +324,7 @@ dearest_text = (
     else "The dearest quarter varies by city."
 )
 
-# Quarters each X-13 run covered (one per city and dwelling type), quoted in appendix Step 1.
+# Quarters each X-13 run covered (one per city and dwelling type), quoted in the appendix, Step 1.
 lengths = all_factors.groupby(level="dwelling").count().stack()
 n_quarters = span(lengths, "{:.0f}")
 series_length = (
@@ -281,12 +334,13 @@ series_length = (
 n_candidates = span(2 * lengths, "{:.0f}")
 ```
 
-To determine whether housing price seasonality is statistically significant and measure each quarter's effect in each city, I use X-13ARIMA-SEATS [@x13manual]. X-13 is the US Census Bureau's seasonal adjustment program and is built upon the X-11 method [@shiskin1967]. X-11 also underpins the ABS's own seasonal adjustment. X-13 is used in several recent studies on housing price seasonality. For example, researchers at the US Federal Housing Finance Agency used it to seasonally adjust the agency's house price indexes for more than 400 metropolitan areas, finding that seasonality differs between areas [@doerner2022]. @hu2025 also used it and found that prices and sales in the US rise in spring and summer and fall in winter, that this is more pronounced in colder regions, and that since COVID it has also shifted earlier in the year.
+To determine whether seasonality in established houses and attached dwellings is statistically significant and to estimate each quarter's effect on prices for both property types in each city, I use X-13ARIMA-SEATS [@x13manual]. X-13 is the US Census Bureau's seasonal adjustment program and is built upon the X-11 method [@shiskin1967]. X-11 also underpins the ABS's own seasonal adjustment. X-13 is used in several recent studies on housing price seasonality. For example, @doerner2022, from the US Federal Housing Finance Agency, used it to seasonally adjust the agency's house price indexes for more than 400 metropolitan areas, finding that seasonality differs between areas. @hu2025 also used X-13 and found that (i) prices and sales in the US rise in spring and summer and fall in winter; (ii) seasonality is more pronounced in colder regions; and (iii) since COVID, the seasonal peak has moved earlier in the year. The [appendix](#x13-appendix) provides a step-by-step explanation of the X-13 procedure.
 
-The table below shows the results for each dwelling type. The Seasonality column gives X-13's verdict on whether seasonality is present, and columns Q1 to Q4 show how far prices are, on average, above or below their seasonally adjusted level in each quarter.
+@tbl-x13-results shows the results for each dwelling type. The Seasonality column gives X-13's verdict on whether seasonality is present, and columns Q1 to Q4 show how far prices are, on average, above or below their seasonally adjusted level in each quarter.
 
 ```{python}
 #| label: x13-table
+#| output: asis
 #| echo: false
 # HTML rather than a Markdown table, which can't group columns under a dwelling-type header.
 quarter_heads = "".join(f'<th style="text-align: right">Q{q}</th>' for q in range(1, 5))
@@ -312,27 +366,20 @@ for city in CAPITALS:
         )
     html.append("</tr>")
 html.append("</tbody></table></div>")
-display(HTML("".join(html)))
-
-dates = all_factors.index.get_level_values("date")
-display(Markdown(
-    "*Seasonality and average seasonal factors for the median price of established houses "
-    "and attached dwellings, by capital city. Seasonality is X-13ARIMA-SEATS's combined test "
-    "for identifiable seasonality (see the appendix). Q1 to Q4 give the average seasonal "
-    "factor of each quarter (Q1 is the March quarter, Q4 the December quarter), in per cent "
-    "above or below the seasonally adjusted price, over "
-    f"{dates.min():%B %Y} to {dates.max():%B %Y} for established houses and from "
-    f"{all_factors.xs(ATTACHED, level='dwelling').index.min():%B %Y} for attached dwellings. "
-    "Factors are faded where X-13 finds no identifiable seasonality, as they then mostly "
-    f"reflect noise. Source: {SOURCE}; author's calculations.*"
-))
+print_float(
+    "tbl-x13-results",
+    "".join(html),
+    "X-13ARIMA-SEATS's combined test for identifiable seasonality and Q1 to Q4 average seasonal "
+    "factors for the median price of established houses and attached dwellings, by capital "
+    "city. Factors are faded where X-13 finds no identifiable seasonality.",
+)
 ```
 
-For established houses, `{python} passes(HOUSES)` the program's combined test for identifiable seasonality. `{python} dearest_text` `{python} join(largest)` have the largest swings, `{python} swings(largest)`. In the other capitals prices are `{python} swings(others)`. `{python} attached_text` An earlier study of the eight capitals, @valadkhani2015, used monthly prices and a different method, and also found sizable seasonal effects, in the smallest capitals (Darwin and Hobart) and the largest (Melbourne and Sydney).
+For established houses, `{python} passes(house_cities)` the program's combined test for identifiable seasonality. `{python} dearest_text` `{python} join(largest)` have the largest swings, `{python} swings(largest)`. In the other capitals prices are `{python} swings(others)`. `{python} attached_text` An earlier study of the eight capitals, @valadkhani2015, used monthly prices and a different method, and also found sizable seasonal effects, in the smallest capitals (Darwin and Hobart) and the largest (Melbourne and Sydney).
 
 ## Implications for buyers and sellers
 
-## Appendix: The X-13ARIMA-SEATS methodology {.appendix}
+## Appendix: The X-13ARIMA-SEATS methodology {#x13-appendix}
 
 This appendix explains the @x13manual's X-13ARIMA-SEATS procedure to estimate the seasonal factors of the log of each city's quarterly median price, for established houses and attached dwellings separately.
 
@@ -380,7 +427,7 @@ $\varepsilon_t$ is the genuine surprise in each quarter, the part nothing in the
 
 So, X-13 has four things to find: the outliers and their sizes $\beta_k$, the differencing orders $d$ and $D$, the numbers of AR and MA terms $p$, $q$, $P$ and $Q$, and the coefficients themselves ($\phi_1$, $\Theta_1$ and so on). Steps 1 to 4 below describe how X-13 finds them, in the sequence it follows.
 
-### The estimation
+### Estimation
 
 #### Step 1: Search for outliers
 

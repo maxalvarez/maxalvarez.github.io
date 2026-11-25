@@ -16,3 +16,4 @@ format:
   html:
     theme: cosmo
     css: styles.css
+    include-after-body: _back-to-top.html

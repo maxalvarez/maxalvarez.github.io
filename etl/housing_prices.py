@@ -6,8 +6,8 @@ Downloads the ABS Excel workbook for the chosen release and writes a tidy
 long CSV to data/processed/housing_prices.csv with one row per
 (date, region, measure).
 
-To point at a newer release, bump QUARTER_MONTH / YEAR. The URL and figure
-citation follow, and CI re-runs this on push.
+To point at a newer release, bump QUARTER_MONTH / YEAR. The download URL and the
+post's link and sample dates follow, and CI re-runs this on push.
 """
 
 import calendar
@@ -20,18 +20,11 @@ import pandas as pd
 QUARTER_MONTH = 6
 YEAR = 2026
 
-CATALOGUE = "6432.0"
-TABLE = "Table 2"
 _MONTH = calendar.month_name[QUARTER_MONTH]
-RELEASE_LABEL = f"{_MONTH} Quarter {YEAR}"
 _QUARTER_SLUG = f"{_MONTH[:3].lower()}-quarter-{YEAR}"
-PUBLICATION = "Total Value of Dwellings"
-# Citation used in figure and table captions.
-SOURCE = (
-    f"Australian Bureau of Statistics, {PUBLICATION}, {RELEASE_LABEL} "
-    f"(cat. no. {CATALOGUE}), {TABLE}"
-)
-URL = f"https://www.abs.gov.au/statistics/economy/price-indexes-and-inflation/total-value-dwellings/{_QUARTER_SLUG}/643202.xlsx"
+# The release's web page (linked from the post) and its Table 2 workbook.
+RELEASE_PAGE = f"https://www.abs.gov.au/statistics/economy/price-indexes-and-inflation/total-value-dwellings/{_QUARTER_SLUG}"
+URL = f"{RELEASE_PAGE}/643202.xlsx"
 
 _ROOT = Path(__file__).parent.parent
 RAW_FILE = _ROOT / "data" / "raw" / "643202.xlsx"

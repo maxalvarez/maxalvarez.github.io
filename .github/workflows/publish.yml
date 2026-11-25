@@ -56,6 +56,11 @@ jobs:
         with:
           path: _site
 
+      # Workaround for actions/deploy-pages#451: the deploy step sometimes looks for the uploaded
+      # site before GitHub has registered it and fails. Remove once that issue is fixed.
+      - name: Wait for the artifact to be listed
+        run: sleep 30
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4

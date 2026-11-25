@@ -1,0 +1,21 @@
+<!-- "Back to top" button, shown whenever the page is scrolled down (Quarto's own one shows only while scrolling up). -->
+<button type="button" id="back-to-top" aria-label="Back to top" title="Back to top">
+  <i class="bi bi-arrow-up" aria-hidden="true"></i> Top
+</button>
+<script>
+  (() => {
+    const btn = document.getElementById("back-to-top");
+    const SHOW_AFTER = 400; // pixels scrolled before the button appears
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => btn.classList.toggle("visible", window.scrollY > SHOW_AFTER);
+    window.addEventListener("scroll", update, { passive: true });
+    btn.addEventListener("click", () => {
+      window.scrollTo({ top: 0, behavior: reduceMotion.matches ? "auto" : "smooth" });
+      // Move keyboard focus to the top too, so the next Tab doesn't jump back down the page.
+      const top = document.getElementById("quarto-header") || document.body;
+      top.setAttribute("tabindex", "-1");
+      top.focus({ preventScroll: true });
+    });
+    update();
+  })();
+</script>
