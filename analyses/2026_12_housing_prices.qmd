@@ -3,11 +3,12 @@ title: "Is there a best time of year to buy or sell a home in Australia?"
 date: 2026-12-01
 date-format: "MMMM YYYY"
 categories: [Housing Economics]
-description: "Understanding residential property price seasonality helps buyers and sellers strategise when to make an offer or list a home to buy cheaper and sell for more."
+description: "Understanding residential property price seasonality helps buyers plan their offers and sellers strategise when to list, or whether to accept or decline offers, so they can buy cheaper and sell for more."
 image: images/melbourne_auction_2026.jpeg
 image-alt: "Two real estate agent boards outside neighbouring townhouses in Rosanna, Melbourne."
 bibliography: references.bib
 csl: apa.csl
+aliases: [2026_10_housing_prices.html]
 ---
 
 ::: {.column-screen}
@@ -16,11 +17,11 @@ csl: apa.csl
 
 This year, I entered the property market for the first time. While attending inspections, auctions, and making offers, I wondered whether there was a more convenient season to buy. I thought of that, obviously, alongside all other factors that can determine a specific dwelling's price and overall property market trends. To answer that question, I analysed median prices of established houses and attached dwellings (townhouses, apartments) over time. Although I was searching for a home only in Melbourne, I included all capital cities to see whether seasonality was present only in some cities and, if it was present in more than one city, whether their seasonality differed. The latter could be due to differences in cities' weather seasonality. For example, Brisbane's relatively mild and short winter compared to Melbourne's.
 
-I am not the first to examine seasonality in housing prices, not even in Australia. @valadkhani2015, for instance, analysed monthly price seasonality in the eight capital cities from 1995 to 2015, separating houses and apartments. They found noticeable seasonality in all cities, more pronounced in houses than apartments. Regarding which months were the most and least expensive, their findings are difficult to distil into a single headline; however, they tend to suggest that summers were more expensive and spring cheaper in most cities.
+Before starting the analysis, I looked online for studies on the topic. As expected, I found several relevant works, including one from Australia conducted by @valadkhani2015. The authors analysed monthly price seasonality in the eight capital cities from 1995 to 2015, separating houses and apartments. They found noticeable seasonality in all cities, more pronounced in houses than apartments. Regarding which months were the most and least expensive, their findings are difficult to distil into a single headline; however, they tend to suggest that summers were more expensive and spring cheaper in most cities.
 
-Although there is already a study covering housing price seasonality in Australia, I still wanted to go ahead with my own to account for post-2015 episodes. The most prominent shock has been COVID, which severely impacted the property market through border closures and by accelerating the adoption of remote working. Another noteworthy development is last year's drop in housing prices, driven by tax changes and interest rate hikes.
+Despite already existing a study covering housing price seasonality in Australia, I thought revisiting the topic was still needed to account for post-2015 episodes. The most prominent shock has been COVID, which severely impacted the property market through border closures and by accelerating the adoption of remote working. Another noteworthy development is last year's drop in housing prices, driven by tax changes and interest rate hikes.
 
-This post presents the study, which is organised as follows. I start by illustrating the housing prices data and its potential seasonality. Then, I present the results of the formal seasonality statistical analysis, which identifies the most and least expensive seasons in each city. Next, I discuss limitations and implications for prospective buyers' and sellers' strategies. Finally, I include an appendix explaining the methodology used to identify seasonality.
+This post presents the study, which I have organised as follows. I start by illustrating the housing prices data and its potential seasonality. Then, I present the results of the formal seasonality statistical analysis, which identifies the most and least expensive seasons in each city. Next, I discuss limitations and implications for prospective buyers' and sellers' strategies. Finally, I include an appendix explaining the methodology used to identify seasonality.
 
 ## Data and exploratory analysis
 
@@ -224,7 +225,7 @@ print_float(
 )
 ```
 
-@fig-capital-prices shows a clear pattern for houses. In every city, prices have been above their trend in the fourth quarter (October to December) in most years, and on average that is also when they have grown fastest. The low point comes in the third quarter (July to September) in most cities, but in the first quarter (January to March) in Sydney and Melbourne. Attached dwellings show a less pronounced pattern. Sydney and Melbourne follow a milder version of their houses' cycle, with the second quarter about as expensive as the fourth. Elsewhere, the clearest feature is a third-quarter dip, most visible in Hobart and Darwin.
+@fig-capital-prices shows a clear pattern for houses. In every city, prices have been above their trend in Q4 (October to December) in most years, and on average that is also when they have grown fastest. The low point comes in Q3 (July to September) in most cities, and in Q1 (January to March) in Sydney and Melbourne. Attached dwellings show a less pronounced pattern. Sydney and Melbourne follow a milder version of their houses' cycle, with prices also high in Q2. Elsewhere, the clearest feature is a Q3 dip, most visible in Hobart and Darwin.
 
 ## A formal identification of seasonality
 
@@ -245,7 +246,6 @@ for dwelling in DWELLINGS:
     f = all_factors.xs(dwelling, level="dwelling")[CAPITALS]
     quarter_by[dwelling] = f.groupby(f.index.quarter).mean().T
 by_quarter = quarter_by[HOUSES]
-QUARTER_NAMES = {1: "March", 2: "June", 3: "September", 4: "December"}
 
 
 def join(names):
@@ -270,29 +270,29 @@ def signed(value):
 
 
 def swings(cities, dwelling=HOUSES):
-    """Describe the dearest and cheapest quarters of a group of cities."""
+    """Describe the most expensive and cheapest quarters of a group of cities."""
     group = quarter_by[dwelling].loc[cities]
     peak, trough = group.idxmax(axis=1), group.idxmin(axis=1)
 
     def when(quarters, fallback):
-        """ "in the June quarter" if every city agrees, else the fallback."""
+        """ "in Q2" if every city agrees, else the fallback."""
         if quarters.nunique() == 1:
-            return f"in the {QUARTER_NAMES[quarters.iloc[0]]} quarter"
+            return f"in Q{quarters.iloc[0]}"
         return fallback
 
     text = (
         f"{size(group.max(axis=1))} above the seasonally adjusted price "
-        f"{when(peak, 'in their dearest quarter')} and {size(-group.min(axis=1))} below it "
+        f"{when(peak, 'in their most expensive quarter')} and {size(-group.min(axis=1))} below it "
         f"{when(trough, 'in their cheapest quarter')}"
     )
-    differ = [name for name, q in (("dearest", peak), ("cheapest", trough)) if q.nunique() > 1]
+    differ = [name for name, q in (("most expensive", peak), ("cheapest", trough)) if q.nunique() > 1]
     if differ:
         plural = "s" if len(differ) > 1 else ""
         text += f", with the {join(differ)} quarter{plural} differing between cities"
     return text
 
 
-# The two cities with the widest gap between their dearest and cheapest quarter.
+# The two cities with the widest gap between their most expensive and cheapest quarter.
 spread = by_quarter.max(axis=1) - by_quarter.min(axis=1)
 largest = [c for c in CAPITALS if c in spread.nlargest(2).index]
 others = [c for c in CAPITALS if c not in largest]
@@ -302,26 +302,30 @@ def passing(dwelling):
     return list(t.index[t["combined_test"] == "present"])
 
 
-def passes(cities):
-    if len(cities) == len(CAPITALS):
-        return "every city passes"
-    if not cities:
-        return "no city passes"
-    if len(cities) == 1:
-        return f"only {cities[0]} passes"
-    return f"{len(cities)} of {len(CAPITALS)} cities pass ({join(cities)})"
+NUMBER_WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight"]
+
+
+def identifiable(cities):
+    """ "seasonality is identifiable in three (A, B and C) of the eight cities" """
+    n, total = len(cities), NUMBER_WORDS[len(CAPITALS)]
+    if n == len(CAPITALS):
+        return f"seasonality is identifiable in all {total} cities"
+    if n == 0:
+        return f"seasonality is not identifiable in any of the {total} cities"
+    only = "only " if n == 1 else ""
+    return f"seasonality is identifiable in {only}{NUMBER_WORDS[n]} ({join(cities)}) of the {total} cities"
 
 
 house_cities, attached_cities = passing(HOUSES), passing(ATTACHED)
-attached_text = f"For attached dwellings, such as units, apartments and townhouses, {passes(attached_cities)}" + (
-    f", and in {'that city' if len(attached_cities) == 1 else 'those cities'} prices are "
-    f"{swings(attached_cities, ATTACHED)}." if attached_cities else "."
+attached_text = f"For attached dwellings (units, apartments and townhouses), {identifiable(attached_cities)}." + (
+    f" In {'that city' if len(attached_cities) == 1 else 'those cities'} prices are "
+    f"{swings(attached_cities, ATTACHED)}." if attached_cities else ""
 )
 dearest = by_quarter.idxmax(axis=1)
 dearest_text = (
-    f"The {QUARTER_NAMES[dearest.iloc[0]]} quarter is the dearest everywhere."
+    f"Q{dearest.iloc[0]} is the most expensive quarter everywhere."
     if dearest.nunique() == 1
-    else "The dearest quarter varies by city."
+    else "The most expensive quarter varies by city."
 )
 
 # Quarters each X-13 run covered (one per city and dwelling type), quoted in the appendix, Step 1.
@@ -334,7 +338,7 @@ series_length = (
 n_candidates = span(2 * lengths, "{:.0f}")
 ```
 
-To determine whether seasonality in established houses and attached dwellings is statistically significant and to estimate each quarter's effect on prices for both property types in each city, I use X-13ARIMA-SEATS [@x13manual]. X-13 is the US Census Bureau's seasonal adjustment program and is built upon the X-11 method [@shiskin1967]. X-11 also underpins the ABS's own seasonal adjustment. X-13 is used in several recent studies on housing price seasonality. For example, @doerner2022, from the US Federal Housing Finance Agency, used it to seasonally adjust the agency's house price indexes for more than 400 metropolitan areas, finding that seasonality differs between areas. @hu2025 also used X-13 and found that (i) prices and sales in the US rise in spring and summer and fall in winter; (ii) seasonality is more pronounced in colder regions; and (iii) since COVID, the seasonal peak has moved earlier in the year. The [appendix](#x13-appendix) provides a step-by-step explanation of the X-13 procedure.
+To test whether seasonality is statistically significant and measure its size, I use X-13ARIMA-SEATS [@x13manual], the US Census Bureau's seasonal adjustment program. It is built on the X-11 method [@shiskin1967], which also underpins the ABS's own seasonal adjustment. X-13 is used in several recent studies on housing price seasonality. For example, @doerner2022, from the US Federal Housing Finance Agency, used it to seasonally adjust the agency's house price indexes for more than 400 metropolitan areas, finding that seasonality differs between areas. @hu2025 also used X-13 and found that (i) prices and sales in the US rise in spring and summer and fall in winter; (ii) seasonality is more pronounced in colder regions; and (iii) since COVID, the seasonal peak has moved earlier in the year. The [appendix](#x13-appendix) provides a step-by-step explanation of the X-13 procedure.
 
 @tbl-x13-results shows the results for each dwelling type. The Seasonality column gives X-13's verdict on whether seasonality is present, and columns Q1 to Q4 show how far prices are, on average, above or below their seasonally adjusted level in each quarter.
 
@@ -366,18 +370,58 @@ for city in CAPITALS:
         )
     html.append("</tr>")
 html.append("</tbody></table></div>")
+html.append(
+    '<p class="table-note"><em>Note:</em> Factors are faded where X-13 finds no identifiable '
+    "seasonality.</p>"
+)
 print_float(
     "tbl-x13-results",
     "".join(html),
     "X-13ARIMA-SEATS's combined test for identifiable seasonality and Q1 to Q4 average seasonal "
     "factors for the median price of established houses and attached dwellings, by capital "
-    "city. Factors are faded where X-13 finds no identifiable seasonality.",
+    "city.",
 )
 ```
 
-For established houses, `{python} passes(house_cities)` the program's combined test for identifiable seasonality. `{python} dearest_text` `{python} join(largest)` have the largest swings, `{python} swings(largest)`. In the other capitals prices are `{python} swings(others)`. `{python} attached_text` An earlier study of the eight capitals, @valadkhani2015, used monthly prices and a different method, and also found sizable seasonal effects, in the smallest capitals (Darwin and Hobart) and the largest (Melbourne and Sydney).
+The X-13 results confirm the main takeaways from the visual inspection above. For established houses, `{python} identifiable(house_cities)`. `{python} dearest_text` `{python} join(largest)` have the largest swings, `{python} swings(largest)`. In the other capitals, prices are `{python} swings(others)`. `{python} attached_text`
 
 ## Implications for buyers and sellers
+
+```{python}
+#| label: implications
+#| echo: false
+MONTHS = {1: "January to March", 2: "April to June", 3: "July to September", 4: "October to December"}
+
+# Average quarterly growth of the median house price over the last ten years: the trend that
+# keeps going while a buyer waits for a cheaper quarter.
+growth = prices[HOUSES].pct_change(fill_method=None).iloc[-40:].mean() * 100
+peak_q, cheap_q = by_quarter.idxmax(axis=1), by_quarter.idxmin(axis=1)
+# The text says the cheapest quarter is next to the most expensive one, in every city.
+assert ((peak_q - cheap_q) % 4).isin([1, 3]).all(), "cheapest quarter not next to the dearest"
+
+
+def quarter_of(quarters, cities):
+    """ "Q1 (January to March)", the quarter shared by all the cities."""
+    (q,) = quarters[cities].unique()
+    return f"Q{q} ({MONTHS[q]})"
+
+
+def gap(cities, dwelling=HOUSES):
+    """Range of the gaps between the most expensive and cheapest quarters, in points."""
+    q = quarter_by[dwelling].loc[cities]
+    return span(q.max(axis=1) - q.min(axis=1), "{:.1f}")
+
+
+largest_growth = join(f"{growth[c]:.1f}%" for c in largest)
+
+# Claims the text makes in words; these stop the build if new data ever breaks one.
+assert (peak_q == 4).all() and (cheap_q[largest] == 1).all() and (cheap_q[others] == 3).all()
+assert (spread[largest] > 2 * growth[largest]).all(), "gap no longer 'several times' growth"
+assert (spread[others] < 3 * growth[others]).all(), "three quarters' growth no longer outweighs"
+assert (spread[others] < 2.5 * growth[others]).all(), "gap above 'about two quarters' growth"
+```
+
+For established houses, seasonality is broadly consistent among all capital cities. `{python} quarter_of(peak_q, CAPITALS)` is, on average, the most expensive quarter, so it is the best time to sell and the worst time to buy. The cheapest quarter is `{python} quarter_of(cheap_q, largest)` in `{python} join(largest)` and `{python} quarter_of(cheap_q, others)` in the other capitals. In every city, the cheapest quarter comes right before or right after the most expensive one, so shifting a purchase or sale by just three months can make a difference.
 
 ## Appendix: The X-13ARIMA-SEATS methodology {#x13-appendix}
 

@@ -20,6 +20,14 @@ img.hero-image {
   }
 }
 
+/* Small print under a table, e.g. "Note: ..." under Table 1 of the housing post. */
+.table-note {
+  margin-top: -0.5rem;
+  text-align: left;
+  font-size: 0.875rem;
+  color: var(--bs-secondary-color);
+}
+
 /* "Back to top" button (see _back-to-top.html): bottom right, hidden until the page is scrolled down. */
 #back-to-top {
   position: fixed;
