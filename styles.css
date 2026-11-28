@@ -40,7 +40,7 @@ img.hero-image {
   background: var(--bs-body-bg);
   color: var(--bs-body-color);
   font-size: 0.9rem;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5); /* dark enough to show on the dark page */
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.2s, visibility 0.2s;

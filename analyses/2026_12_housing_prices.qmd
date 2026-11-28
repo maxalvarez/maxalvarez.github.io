@@ -90,9 +90,13 @@ quarters = pd.Index([])
 for frame in [*growth.values(), *deviation.values()]:
     quarters = quarters.union(frame.index)
 
+# Colours from the site's Darkly theme: its info blue (its main blue is too dark for thin lines)
+# and orange for the lines; its gray-300 for text (softer than the page's white) and gray-600
+# for the axes.
+TEXT, AXES = "#dee2e6", "#888888"
 LINES = {
-    "Deviation from trend": (deviation, "#08306b"),
-    "Quarter-on-quarter growth": (growth, "#e66101"),
+    "Deviation from trend": (deviation, "#3498db"),
+    "Quarter-on-quarter growth": (growth, "#fd7e14"),
 }
 
 
@@ -102,8 +106,10 @@ def day(index):
     return index.strftime("%Y-%m-%d")
 
 
+# Quarter bands get lighter through the year: white at rising opacity over the dark page.
 QUARTER_BANDS = {
-    "Q1 (Mar)": "#ffffff", "Q2 (Jun)": "#eeeeee", "Q3 (Sep)": "#d9d9d9", "Q4 (Dec)": "#bdbdbd",
+    label: f"rgba(255,255,255,{alpha})"
+    for label, alpha in zip(["Q1 (Mar)", "Q2 (Jun)", "Q3 (Sep)", "Q4 (Dec)"], [0, 0.05, 0.10, 0.16])
 }
 # One heatmap per panel draws the quarter bands: cells are centred on each observation, so a
 # point sits inside its own quarter, and it stays fast where 750 shapes would make zoom lag.
@@ -160,7 +166,7 @@ for row, city in enumerate(CAPITALS, start=1):
         fig.update_yaxes(range=y_range, row=row, col=col)
     # The right panel shares the left panel's scale, so its tick labels would only repeat.
     fig.update_yaxes(showticklabels=False, row=row, col=2)
-fig.add_hline(y=0, line={"color": "black", "width": 0.8})
+fig.add_hline(y=0, line={"color": TEXT, "width": 0.8})
 
 # Empty traces supply the quarter legend, because the heatmaps have no legend entries. They go
 # in a second legend, under the one for the lines.
@@ -169,18 +175,18 @@ for label, shade in QUARTER_BANDS.items():
         x=[None], y=[None], mode="markers", name=label, legend="legend2",
         marker={
             "symbol": "square", "size": 13, "color": shade,
-            "line": {"color": "#999999", "width": 1},
+            "line": {"color": TEXT, "width": 1},
         },
     ))
 
 fig.update_xaxes(
-    dtick="M12", tickformat="%Y", tickangle=-90, ticks="outside", showgrid=False,
-    showline=True, linecolor="black", mirror=True,
+    dtick="M12", tickformat="%Y", tickangle=-90, ticks="outside", tickcolor=AXES, showgrid=False,
+    showline=True, linecolor=AXES, mirror=True,
 )
 # A fixed y-range makes dragging zoom along time only, keeping every panel's scale.
 fig.update_yaxes(
-    nticks=5, ticks="outside", showgrid=False, zeroline=False, showline=True,
-    linecolor="black", mirror=True, fixedrange=True,
+    nticks=5, ticks="outside", tickcolor=AXES, showgrid=False, zeroline=False, showline=True,
+    linecolor=AXES, mirror=True, fixedrange=True,
 )
 fig.add_annotation(
     text="Per cent", textangle=-90, showarrow=False,
@@ -188,7 +194,11 @@ fig.add_annotation(
 )
 fig.update_layout(
     height=FIG_HEIGHT, margin={"l": 60, "r": 10, "t": 120, "b": 50},
-    template="plotly_white",
+    # The dark template only still matters for details set nowhere else, such as hover labels.
+    template="plotly_dark",
+    # Transparent, so the page's own background shows through.
+    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+    font_color=TEXT,
     legend={
         "orientation": "h", "x": 0.5, "xanchor": "center", "y": 1, "yanchor": "top",
         "yref": "container", "itemclick": False, "itemdoubleclick": False,
@@ -305,19 +315,24 @@ def passing(dwelling):
 NUMBER_WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight"]
 
 
-def identifiable(cities):
-    """ "seasonality is identifiable in three (A, B and C) of the eight cities" """
+def identifiable(cities, only=False):
+    """ "seasonality is identifiable in (only) three (A, B and C) of the eight cities" """
     n, total = len(cities), NUMBER_WORDS[len(CAPITALS)]
     if n == len(CAPITALS):
         return f"seasonality is identifiable in all {total} cities"
     if n == 0:
         return f"seasonality is not identifiable in any of the {total} cities"
-    only = "only " if n == 1 else ""
-    return f"seasonality is identifiable in {only}{NUMBER_WORDS[n]} ({join(cities)}) of the {total} cities"
+    prefix = "only " if only or n == 1 else ""
+    return f"seasonality is identifiable in {prefix}{NUMBER_WORDS[n]} ({join(cities)}) of the {total} cities"
 
 
 house_cities, attached_cities = passing(HOUSES), passing(ATTACHED)
-attached_text = f"For attached dwellings (units, apartments and townhouses), {identifiable(attached_cities)}." + (
+# Contrast attached dwellings with houses when they are seasonal in fewer cities.
+fewer = len(attached_cities) < len(house_cities)
+attached_text = (
+    f"For attached dwellings (units, apartments and townhouses){', however,' if fewer else ','} "
+    f"{identifiable(attached_cities, only=fewer)}."
+) + (
     f" In {'that city' if len(attached_cities) == 1 else 'those cities'} prices are "
     f"{swings(attached_cities, ATTACHED)}." if attached_cities else ""
 )
@@ -340,7 +355,7 @@ n_candidates = span(2 * lengths, "{:.0f}")
 
 To test whether seasonality is statistically significant and measure its size, I use X-13ARIMA-SEATS [@x13manual], the US Census Bureau's seasonal adjustment program. It is built on the X-11 method [@shiskin1967], which also underpins the ABS's own seasonal adjustment. X-13 is used in several recent studies on housing price seasonality. For example, @doerner2022, from the US Federal Housing Finance Agency, used it to seasonally adjust the agency's house price indexes for more than 400 metropolitan areas, finding that seasonality differs between areas. @hu2025 also used X-13 and found that (i) prices and sales in the US rise in spring and summer and fall in winter; (ii) seasonality is more pronounced in colder regions; and (iii) since COVID, the seasonal peak has moved earlier in the year. The [appendix](#x13-appendix) provides a step-by-step explanation of the X-13 procedure.
 
-@tbl-x13-results shows the results for each dwelling type. The Seasonality column gives X-13's verdict on whether seasonality is present, and columns Q1 to Q4 show how far prices are, on average, above or below their seasonally adjusted level in each quarter.
+@tbl-x13-results shows the results for each dwelling type. The Seasonality column gives X-13's verdict on whether seasonality is present, and columns Q1 to Q4 show how far prices are, on average, above or below the seasonally adjusted price in each quarter. The seasonally adjusted price is X-13's estimate of what the median price would have been in that quarter without the regular within-year pattern. See [Steps 5 and 6](#x13-step5) of the appendix for more details. For example, a value of 3% in Q4 means that, in a typical year, Q4 prices are 3% above the seasonally adjusted price.
 
 ```{python}
 #| label: x13-table
@@ -361,7 +376,8 @@ for city in CAPITALS:
     for dwelling in DWELLINGS:
         verdict = tests_by[dwelling].loc[city, "combined_test"]
         # Factors of a series without identifiable seasonality are mostly noise, so fade them.
-        fade = "" if verdict == "present" else "; opacity: 0.45"
+        # Only the text fades: opacity would also fade the cell's dark background.
+        fade = "" if verdict == "present" else "; color: var(--bs-secondary-color)"
         # A missing verdict (X-13 output not parsed) shows as "n/a" rather than breaking the build.
         html.append(f"<td>{verdict.capitalize() if pd.notna(verdict) else 'n/a'}</td>")
         html.extend(
@@ -390,8 +406,6 @@ The X-13 results confirm the main takeaways from the visual inspection above. Fo
 ```{python}
 #| label: implications
 #| echo: false
-MONTHS = {1: "January to March", 2: "April to June", 3: "July to September", 4: "October to December"}
-
 # Average quarterly growth of the median house price over the last ten years: the trend that
 # keeps going while a buyer waits for a cheaper quarter.
 growth = prices[HOUSES].pct_change(fill_method=None).iloc[-40:].mean() * 100
@@ -401,9 +415,9 @@ assert ((peak_q - cheap_q) % 4).isin([1, 3]).all(), "cheapest quarter not next t
 
 
 def quarter_of(quarters, cities):
-    """ "Q1 (January to March)", the quarter shared by all the cities."""
+    """ "Q1", the quarter shared by all the cities."""
     (q,) = quarters[cities].unique()
-    return f"Q{q} ({MONTHS[q]})"
+    return f"Q{q}"
 
 
 def gap(cities, dwelling=HOUSES):
@@ -484,10 +498,10 @@ $$
 The two coefficients, $\theta_1$ and $\Theta_1$, are estimated by maximum likelihood. X-13 then searches for outliers using this default model:
 
 1. **List the candidates.** A candidate is one outlier type (AO or LS) starting at one particular quarter. A series of $N$ quarters has close to $2N$ candidates. Here, `{python} series_length`, so there are about `{python} n_candidates` candidates.
-2. **Score each candidate.** For each candidate, its $\beta_k$ is computed as the value that the candidate's regressor would get if it were added to the default model, holding $\theta_1$ and $\Theta_1$ fixed. Then, X-13 records its $t$-statistic.
-3. **Add the strongest candidate.** If the largest absolute $t$-statistic exceeds a critical value, the candidate's regressor is added to the default model and the model is re-estimated to update $\theta_1$, $\Theta_1$ and $\beta_k$.
-4. **Repeat.** X-13 repeats points 1 to 3 until no remaining candidate has a $t$-statistic above the critical value.
-5. **Re-check.** X-13 then removes, one at a time and starting with the least significant, each outlier it added whose $t$-statistic no longer exceeds the critical value.
+2. **Score each candidate.** Compute each candidate's $\beta_k$ as the value that its regressor would get if it were added to the default model, holding $\theta_1$ and $\Theta_1$ fixed, and record its $t$-statistic.
+3. **Add the strongest candidate.** If the largest absolute $t$-statistic exceeds a critical value, add that candidate's regressor to the default model and re-estimate the model to update $\theta_1$, $\Theta_1$ and $\beta_k$.
+4. **Repeat.** Repeat points 1 to 3 until no remaining candidate has a $t$-statistic above the critical value.
+5. **Re-check.** Remove, one at a time and starting with the least significant, each added outlier whose $t$-statistic no longer exceeds the critical value.
 
 Finally, the outliers found are subtracted from the log price, which gives $y_t - \sum_k \beta_k x_{k,t}$, so the following steps work on this outlier-free log price series.
 
@@ -495,12 +509,12 @@ Finally, the outliers found are subtracted from the log price, which gives $y_t 
 
 Then, the X-13 program tests whether the outlier-free log price from Step 1 needs differencing to become stationary:
 
-1. Fits a model with two quarterly AR terms, one yearly AR term and no MA terms, $(2\ 0\ 0)(1\ 0\ 0)$, to the outlier-free log price.
-2. Computes the roots of the estimated quarterly AR polynomial $\phi(B)$ and yearly AR polynomial $\Phi(B^4)$: the values of $B$ at which each polynomial equals zero.
-3. Checks whether any real root is close to one. A root of exactly one, a *unit root*, means the AR coefficients add up to one, so shocks never fade and the series is non-stationary. An estimated root is never exactly one, so X-13 treats any real root close enough to one as a unit root.
-4. Adds one difference for each such root: a quarterly difference for a root of $\phi(B)$, a yearly difference for a root of $\Phi(B^4)$.
-5. Differences the outlier-free log price accordingly and fits a model with one AR term and one MA term of each kind, quarterly and yearly, $(1\ d\ 1)(1\ D\ 1)$.
-6. Checks whether the estimated quarterly AR coefficient $\phi_1$ or yearly AR coefficient $\Phi_1$ is close to one. If so, adds another difference of the matching kind and repeats point 5. This continues until neither AR coefficient is close to one, up to a maximum of $d = 2$ and $D = 1$.
+1. **Fit an AR model.** Use two quarterly AR terms, one yearly AR term and no MA terms, $(2\ 0\ 0)(1\ 0\ 0)$, on the outlier-free log price.
+2. **Find the roots.** Compute the roots of the estimated quarterly AR polynomial $\phi(B)$ and yearly AR polynomial $\Phi(B^4)$: the values of $B$ at which each polynomial equals zero.
+3. **Look for unit roots.** Check whether any real root is close to one. A root of exactly one, a *unit root*, means the AR coefficients add up to one, so shocks never fade and the series is non-stationary. An estimated root is never exactly one, so X-13 treats any real root close enough to one as a unit root.
+4. **Add differences.** Add one difference for each such root: a quarterly difference for a root of $\phi(B)$, a yearly difference for a root of $\Phi(B^4)$.
+5. **Refit.** Difference the outlier-free log price accordingly and fit a model with one AR term and one MA term of each kind, quarterly and yearly, $(1\ d\ 1)(1\ D\ 1)$.
+6. **Check again.** If the estimated quarterly AR coefficient $\phi_1$ or yearly AR coefficient $\Phi_1$ is close to one, add another difference of the matching kind and repeat point 5. This continues until neither AR coefficient is close to one, up to a maximum of $d = 2$ and $D = 1$.
 
 #### Step 3: The numbers of AR and MA terms $p$, $q$, $P$ and $Q$
 
@@ -510,14 +524,14 @@ With $d$ and $D$ fixed, X-13 chooses how far back the model looks: the number of
 
 With the numbers of AR and MA terms chosen, X-13 settles the model:
 
-1. **Search for outliers again.** If the model chosen in Step 3 differs from the default model, X-13 discards the outliers found in Step 1. It repeats the outlier search of Step 1 on the log price $y_t$, using the chosen model in place of the default model.
-2. **Compare with the default model.** X-13 keeps the default model unless the chosen model's residuals, the estimated surprises $\varepsilon_t$, are clearly smaller or less correlated over time.
-3. **Check the model it kept.** X-13 tests the model once more for unit roots and drops any term whose coefficient is too small or insignificant.
-4. **Estimate the final model.** X-13 estimates all the coefficients and the $\beta_k$ together by maximum likelihood. The result is the final regARIMA model.
+1. **Search for outliers again.** If the model chosen in Step 3 differs from the default model, discard the outliers found in Step 1 and repeat the outlier search of Step 1 on the log price $y_t$, using the chosen model in place of the default model.
+2. **Compare with the default model.** Keep the default model unless the chosen model's residuals, the estimated surprises $\varepsilon_t$, are clearly smaller or less correlated over time.
+3. **Check the model kept.** Test it once more for unit roots and drop any term whose coefficient is too small or insignificant.
+4. **Estimate the final model.** Estimate all the coefficients and the $\beta_k$ together by maximum likelihood. The result is the final regARIMA model.
 
 The final regARIMA model does two jobs for Step 5. First, it removes the outliers from the price series, so a one-off spike is not mistaken for seasonality. Second, it forecasts the price series one year ahead, so the moving averages in Step 5 have data to work with at the end of the sample.
 
-#### Step 5: Separate the seasonal factors with the X-11 filter
+#### Step 5: Separate the seasonal factors with the X-11 filter {#x13-step5}
 
 Within the X-13 procedure, X-11, a seasonal adjustment method developed by the US Census Bureau in the 1960s [@shiskin1967], is applied to separate the seasonal pattern from the trend and the noise.
 
@@ -539,7 +553,7 @@ X-11 splits the outlier-adjusted price, $P_t = e^{z_t}$, into trend $T_t$, seaso
 
 4. **First seasonal adjustment.** Divide the series by the seasonal factors $S_t$ from point 3: $A_t = P_t / S_t$.
 5. **Better trend.** Re-estimate the trend from $A_t$ with a Henderson moving average. This filter follows turning points more closely than a plain average. X-13 chooses its length automatically.
-6. **Final seasonal factors.** Repeat points 2 and 3 of this list with the better trend. X-13 picks the length of the seasonal moving average automatically, based on how noisy the series is relative to its seasonal pattern.
+6. **Final seasonal factors.** Repeat points 2 and 3 with the better trend. X-13 picks the length of the seasonal moving average automatically, based on how noisy the series is relative to its seasonal pattern.
 
 At each round, X-11 also detects extreme values of the irregular part and gives them less weight, so they don't distort the seasonal factors.
 
@@ -573,3 +587,8 @@ X-13 tests the seasonal-irregular ratios $SI_t$ from the final round of X-11:
 2. If the moving F test is significant at the 5% level and $M7 \ge 1$, the pattern moves too much to identify, so seasonality is **not present**.
 3. If the stable F is 7 or less, or the moving F is at least a third of the stable F, or the Kruskal–Wallis test is not significant at the 0.1% level, seasonality is **probably not present**.
 4. Otherwise, seasonality is **present**.
+
+## References
+
+::: {#refs}
+:::

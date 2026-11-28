@@ -14,6 +14,6 @@ website:
 
 format:
   html:
-    theme: cosmo
+    theme: darkly
     css: styles.css
     include-after-body: _back-to-top.html
